@@ -1,6 +1,8 @@
 {
-  "name": "rest-express",
+  "name": "cctp-wiki-suche",
   "version": "1.0.0",
+  "private": false,
+  "description": "Such-Chat über die fünf freigegebenen Wiki-Seiten des CCTP Knowledge Lab",
   "license": "MIT",
   "type": "module",
   "scripts": {
