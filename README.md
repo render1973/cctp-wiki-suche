@@ -1,8 +1,8 @@
 # CCTP Wiki-Suche
 
-Such-Chat über die fünf freigegebenen Wiki-Seiten des [CCTP Knowledge Lab](https://github.com/render1973/cctp-wiki-suche).
+Lokaler MCP-Server (stdio, [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk)) für die fünf freigegebenen Wiki-Seiten des CCTP Knowledge Lab. Der Server liefert nur Rohtreffer aus diesem Bestand — Seitentitel, Status, Rohquelle-Pfad und Textausschnitt. Das Formulieren der Antwort übernimmt der MCP-Client (z. B. Claude Desktop oder Claude Code), nicht dieses Repo.
 
-Der Chat beantwortet nur, was in diesen Seiten steht. Jede Antwort nennt Seite, Status und Rohquelle. CDE und DMS bleiben für verbindliche Projekt-, Rechts- und Normunterlagen führend.
+CDE und DMS bleiben für verbindliche Projekt-, Rechts- und Normunterlagen führend.
 
 ## Bestand
 
@@ -16,26 +16,57 @@ Der Chat beantwortet nur, was in diesen Seiten steht. Jede Antwort nennt Seite, 
 
 Status der Seiten: `freigegeben`. Status und fachliche Prüfung setzt allein Thomas Heim.
 
+## Tools
+
+- `such_cctp_wiki(query: string)` — durchsucht die fünf Seiten und gibt pro Treffer Titel, Status, Rohquelle-Pfad und den relevanten Textausschnitt zurück.
+- `liste_cctp_wiki_seiten()` — gibt die Tabelle aller fünf Seiten mit Titel, Datei und Status zurück.
+
 ## Lokal starten
 
 Voraussetzungen: Node.js 20 oder neuer.
 
 ```bash
-cp .env.example .env
-# optional: ANTHROPIC_API_KEY in .env setzen
 npm install
-npm run dev
+npm test    # Tests für beide Tools
+npm start   # startet den MCP-Server auf stdio (zum manuellen Testen)
 ```
 
-Die App läuft auf [http://localhost:5000](http://localhost:5000).
+`npm start` allein ist zum Ausprobieren gedacht — im Alltag startet der MCP-Client (Claude Desktop / Claude Code) den Server selbst, siehe unten.
 
-Ohne API-Key fällt der Chat auf eine einfache Textsuche in den fünf Seiten zurück. Mit Key antwortet er über Claude Haiku und bleibt an denselben Bestand gebunden.
+## In Claude Desktop einbinden
 
-Produktion:
+In der `claude_desktop_config.json` (Claude Desktop → Einstellungen → Developer → Edit Config) einen Eintrag ergänzen:
+
+```json
+{
+  "mcpServers": {
+    "cctp-wiki-suche": {
+      "command": "npx",
+      "args": ["tsx", "/absoluter/pfad/zu/cctp-wiki-suche/server/index.ts"]
+    }
+  }
+}
+```
+
+Absoluten Pfad anpassen, Claude Desktop neu starten. Die beiden Tools erscheinen danach im Werkzeug-Menü.
+
+## In Claude Code einbinden
 
 ```bash
-npm run build
-npm start
+claude mcp add cctp-wiki-suche -- npx tsx /absoluter/pfad/zu/cctp-wiki-suche/server/index.ts
+```
+
+Oder per `.mcp.json` im Projekt, das die Suche nutzen soll:
+
+```json
+{
+  "mcpServers": {
+    "cctp-wiki-suche": {
+      "command": "npx",
+      "args": ["tsx", "/absoluter/pfad/zu/cctp-wiki-suche/server/index.ts"]
+    }
+  }
+}
 ```
 
 ## Was dieses Repo nicht ist
@@ -43,6 +74,7 @@ npm start
 - Kein Ersatz für CDE oder DMS
 - Kein Roharchiv. Originalquellen bleiben unverändert
 - Keine Freigabe-Instanz. `geprueft` und `freigegeben` setzt nur Thomas Heim
+- Kein Chat und kein Antwortgenerator. Der MCP-Server liefert Rohtreffer, formuliert aber keine Antwort — das macht der anfragende MCP-Client
 
 ## Lizenz
 

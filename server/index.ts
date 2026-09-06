@@ -1,105 +1,46 @@
-import "dotenv/config";
-import express, { Response, NextFunction } from 'express';
-import type { Request } from 'express';
-import { registerRoutes } from "./routes";
-import { serveStatic } from "./static";
-import { createServer } from "node:http";
+#!/usr/bin/env node
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+import { searchWiki, listWikiPages } from "./search.js";
 
-const app = express();
-const httpServer = createServer(app);
-
-declare module "http" {
-  interface IncomingMessage {
-    rawBody: unknown;
-  }
-}
-
-app.use(
-  express.json({
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
-    },
-  }),
-);
-
-app.use(express.urlencoded({ extended: false }));
-
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
-
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
+const server = new McpServer({
+  name: "cctp-wiki-suche",
+  version: "1.0.0",
 });
 
-(async () => {
-  await registerRoutes(httpServer, app);
-
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    console.error("Internal Server Error:", err);
-
-    if (res.headersSent) {
-      return next(err);
+server.tool(
+  "such_cctp_wiki",
+  "Durchsucht die fünf freigegebenen CCTP-Wiki-Seiten und gibt pro Treffer Seitentitel, Status, Rohquelle-Pfad und den relevanten Textausschnitt zurück.",
+  { query: z.string().trim().min(2).describe("Suchbegriff oder Frage an das Wiki") },
+  async ({ query }) => {
+    const hits = searchWiki(query);
+    if (hits.length === 0) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "Keine Treffer in den fünf freigegebenen Wiki-Seiten.",
+          },
+        ],
+      };
     }
+    return {
+      content: [{ type: "text", text: JSON.stringify(hits, null, 2) }],
+    };
+  },
+);
 
-    return res.status(status).json({ message });
-  });
+server.tool(
+  "liste_cctp_wiki_seiten",
+  "Gibt die Tabelle aller fünf freigegebenen CCTP-Wiki-Seiten mit Titel, Datei und Status zurück.",
+  {},
+  async () => {
+    return {
+      content: [{ type: "text", text: JSON.stringify(listWikiPages(), null, 2) }],
+    };
+  },
+);
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-  } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
-  }
-
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
-})();
+const transport = new StdioServerTransport();
+await server.connect(transport);
