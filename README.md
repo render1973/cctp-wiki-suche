@@ -157,6 +157,14 @@ Token ergänzen/entziehen: `WIKI_TOKENS` in Railway unter **Variables** bearbeit
 
 **Bewusst nicht Vercel** — an 4.5-MB-Body-Limit und 60s-Timeout ist eine frühere Variante dieser Projektlinie bereits gescheitert.
 
+## Docker-Image lokal testen
+
+```bash
+./scripts/verify-docker-e2e.sh
+```
+
+Baut das Image, startet einen Container, verbindet einen echten MCP-Client (offizielles SDK) darüber, schreibt mit Token A, liest mit Token B, prüft den Commit-Autor und dass fehlende/ungültige Tokens abgewiesen werden. **Pusht dabei nicht gegen das echte GitHub** — der Container biegt seinen `origin`-Remote zur Laufzeit auf ein frisches lokales Test-Repo um. Voraussetzungen: `docker`, Node/`npx`, `curl`. Nützlich, um eine Dockerfile-Änderung zu prüfen, bevor sie nach Railway geht.
+
 ### Architektur: Commit/Push im Container
 
 Der lokale stdio-Modus committet/pusht nichts selbst — das erledigte bisher die begleitende Claude-Code-Session per Bash. Im HTTP-Modus gibt es keine solche Session neben dem MCP-Client der Kolleg:innen, also übernimmt der Server das selbst (`server/git.ts`): nach jedem erfolgreichen `schreibe_wiki_seite`
