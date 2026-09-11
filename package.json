@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "start": "tsx server/index.ts",
-    "test": "tsx --test server/search.test.ts",
+    "test": "tsx --test server/*.test.ts",
     "check": "tsc --noEmit"
   },
   "dependencies": {

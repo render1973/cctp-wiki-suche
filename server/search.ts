@@ -40,6 +40,20 @@ function extractPassages(query: string, page: WikiPage, limit = 3): string[] {
     .map((item) => item.block.replace(/\s+/g, " ").slice(0, 420));
 }
 
+// Die Seite selbst liegt in einem 10-wiki/-Pfad (page.path), das ist aber nur
+// die verdichtete Wiki-Seite. Die eigentliche Belegstelle ist die unveränderte
+// Originalquelle im Roharchiv (00-roharchiv/…), auf die "sources" verweist.
+function rawSourcePath(page: WikiPage): string {
+  for (const entry of page.sources) {
+    const candidate = entry.split(" — ")[0]?.trim();
+    if (candidate?.startsWith("00-roharchiv/")) {
+      return candidate;
+    }
+  }
+  // Fallback, falls eine Seite (noch) keine Roharchiv-Quelle nennt.
+  return page.sources[0]?.split(" — ")[0]?.trim() ?? page.path;
+}
+
 export type WikiSearchHit = {
   titel: string;
   status: string;
@@ -59,7 +73,7 @@ export function searchWiki(query: string, limit = 3): WikiSearchHit[] {
     hits.push({
       titel: page.title,
       status: page.status,
-      rohquellePfad: page.path,
+      rohquellePfad: rawSourcePath(page),
       textauszug: passages.join(" […] "),
     });
     if (hits.length >= limit) break;

@@ -11,6 +11,11 @@ test("such_cctp_wiki: Treffer liefert Titel, Status, Pfad und Textausschnitt", (
   assert.equal(typeof hit.status, "string");
   assert.equal(typeof hit.rohquellePfad, "string");
   assert.ok(hit.rohquellePfad.length > 0);
+  assert.match(
+    hit.rohquellePfad,
+    /^00-roharchiv\//,
+    "Rohquelle-Pfad muss auf die Originalquelle im Roharchiv zeigen, nicht auf die Wiki-Seite",
+  );
   assert.ok(hit.textauszug.length > 0);
 });
 

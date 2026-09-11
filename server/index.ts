@@ -3,6 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { searchWiki, listWikiPages } from "./search.js";
+import { schreibeWikiSeite } from "./write-wiki.js";
 
 const server = new McpServer({
   name: "cctp-wiki-suche",
@@ -39,6 +40,37 @@ server.tool(
     return {
       content: [{ type: "text", text: JSON.stringify(listWikiPages(), null, 2) }],
     };
+  },
+);
+
+server.tool(
+  "schreibe_wiki_seite",
+  "Legt eine neue Wiki-Entwurfsseite an oder ergänzt eine bestehende Seite (Titel-Treffer) im CCTP-Wiki. Überschreibt nie, sondern ergänzt mit einem datierten Update-Abschnitt. Neue Seiten erhalten immer Status 'entwurf' — nie automatisch 'geprueft' oder 'freigegeben'. Committet und pusht die Änderung.",
+  {
+    bereich: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("Ordner innerhalb des Wikis, z. B. 'entscheidungen' oder 'forschung'"),
+    titel: z.string().trim().min(1).describe("Titel der Wiki-Seite (dient auch als Treffer für Ergänzungen)"),
+    inhalt: z.string().trim().min(1).describe("Neuer Inhalt bzw. Ergänzung als Markdown/Text"),
+    autor: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe("Autor:in; falls nicht angegeben, aus dem Git-Commit-Kontext abgeleitet"),
+  },
+  async ({ bereich, titel, inhalt, autor }) => {
+    try {
+      const result = await schreibeWikiSeite({ bereich, titel, inhalt, autor });
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    } catch (error) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }],
+      };
+    }
   },
 );
 
