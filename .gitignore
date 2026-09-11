@@ -3,3 +3,6 @@ dist/
 
 *.log
 .DS_Store
+
+# Arbeitsverzeichnis von scripts/verify-docker-e2e.sh
+.e2e-tmp/

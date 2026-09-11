@@ -11,6 +11,14 @@
 #
 # Voraussetzungen: docker, Node/npx (für den MCP-Testclient), git.
 # Aufruf: ./scripts/verify-docker-e2e.sh
+#
+# Docker-Desktop/WSL2-Fallstrick: mktemp -d legt unter /tmp an, das bei
+# Docker Desktop mit WSL2-Backend nicht immer bind-mountbar ist ("/tmp"-Pfad
+# nicht auflösbar). Statt eines System-Temp-Pfads liegt das Arbeitsverzeichnis
+# darum standardmässig direkt im Projekt (.e2e-tmp/), das für Docker ohnehin
+# schon erreichbar sein muss (der Build liest ja dasselbe Verzeichnis). Bei
+# Bedarf überschreibbar: E2E_WORKDIR=/mnt/c/pfad/den/docker/mounten/kann
+# ./scripts/verify-docker-e2e.sh (unter WSL: /mnt/c/... statt C:\...).
 
 set -euo pipefail
 
@@ -18,9 +26,12 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMAGE_TAG="cctp-wiki-suche:e2e"
 CONTAINER_NAME="cctp-wiki-suche-e2e-$$"
 PORT="${PORT:-8091}"
-WORKDIR="$(mktemp -d)"
+WORKDIR="${E2E_WORKDIR:-$REPO_ROOT/.e2e-tmp/run-$$}"
 BARE_REPO="$WORKDIR/test-origin.git"
 CURRENT_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD)"
+
+mkdir -p "$WORKDIR"
+echo "Arbeitsverzeichnis für den Test: $WORKDIR"
 
 cleanup() {
   docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
