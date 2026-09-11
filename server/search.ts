@@ -1,4 +1,4 @@
-import { PAGES, type WikiPage } from "./corpus.js";
+import { getPages, type WikiPage } from "./corpus.js";
 
 function tokenize(text: string): string[] {
   return text
@@ -42,13 +42,15 @@ function extractPassages(query: string, page: WikiPage, limit = 3): string[] {
 
 export type WikiSearchHit = {
   titel: string;
+  bereich: string;
   status: string;
   rohquellePfad: string;
   textauszug: string;
 };
 
 export function searchWiki(query: string, limit = 3): WikiSearchHit[] {
-  const ranked = PAGES.map((page) => ({ page, score: scorePage(query, page) }))
+  const ranked = getPages()
+    .map((page) => ({ page, score: scorePage(query, page) }))
     .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score);
 
@@ -58,6 +60,7 @@ export function searchWiki(query: string, limit = 3): WikiSearchHit[] {
     if (passages.length === 0) continue;
     hits.push({
       titel: page.title,
+      bereich: page.bereich,
       status: page.status,
       rohquellePfad: page.path,
       textauszug: passages.join(" […] "),
@@ -69,14 +72,18 @@ export function searchWiki(query: string, limit = 3): WikiSearchHit[] {
 
 export type WikiPageSummary = {
   titel: string;
+  bereich: string;
   datei: string;
   status: string;
 };
 
-export function listWikiPages(): WikiPageSummary[] {
-  return PAGES.map((page) => ({
-    titel: page.title,
-    datei: `server/wiki/${page.id}.md`,
-    status: page.status,
-  }));
+export function listWikiPages(bereich?: string): WikiPageSummary[] {
+  return getPages()
+    .filter((page) => !bereich || page.bereich === bereich)
+    .map((page) => ({
+      titel: page.title,
+      bereich: page.bereich,
+      datei: page.path,
+      status: page.status,
+    }));
 }
