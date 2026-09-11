@@ -50,6 +50,16 @@ echo "=== 3/6: Container starten (origin im Container auf das Test-Repo umgeboge
 # HEAD in das leere Test-Repo, damit die Historie zueinander passt -
 # git pull --rebase in server/git.ts ist danach ein reines Fast-Forward,
 # ohne die Arbeitskopie zu verändern.
+#
+# `git config --global --add safe.directory /test-origin.git` hier ist bewusst
+# eine dauerhafte globale Config-Änderung - aber NUR innerhalb dieses einen
+# Wegwerf-Containers (--rm, stirbt mit dem Testlauf), nicht auf dem Host und
+# nicht im echten Produktivbetrieb. Server/git.ts selbst nutzt für seine
+# eigenen Git-Aufrufe einen anderen, zustandslosen Mechanismus (siehe dort);
+# dieser eine Bootstrap-Push läuft aber vor dem Node-Prozess in einer reinen
+# Shell und braucht darum seinen eigenen, hier lokal begrenzten Fix, um an
+# das per Bind-Mount eingehängte (aus Containersicht fremd besitzende)
+# Test-Repo pushen zu können.
 docker run -d --rm \
   --name "$CONTAINER_NAME" \
   -p "$PORT:8080" \
@@ -57,7 +67,7 @@ docker run -d --rm \
   -e WIKI_TOKENS='{"tok-a-geheim":{"name":"Person A (Verifikation)","email":"person-a@example.invalid"},"tok-b-geheim":{"name":"Person B (Verifikation)","email":"person-b@example.invalid"}}' \
   --entrypoint sh \
   "$IMAGE_TAG" \
-  -c "git remote set-url origin /test-origin.git && git push origin HEAD:$CURRENT_BRANCH && exec npx tsx server/http.ts" \
+  -c "git config --global --add safe.directory /test-origin.git && git remote set-url origin /test-origin.git && git push origin HEAD:$CURRENT_BRANCH && exec npx tsx server/http.ts" \
   >/dev/null
 
 echo "=== 4/6: Warten, bis der Server im Container bereit ist ==="

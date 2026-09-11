@@ -148,6 +148,50 @@ test("pushWithRetry: löst einen Push-Konflikt durch Rebase+Retry auf", async ()
   }
 });
 
+test("commitAndPushWikiChange: funktioniert trotz abweichendem Dateibesitzer am Push-Ziel (dubious ownership)", async (t) => {
+  // Reproduziert genau den von Thomas unter Docker Desktop/WSL2 gemeldeten
+  // Fehler: ein per Bind-Mount eingehängtes Push-Ziel gehört aus
+  // Containersicht einem anderen Nutzer als dem Server-Prozess. git
+  // verweigert dann standardmässig jede Operation darauf ("dubious
+  // ownership") - dieser Test chownt das bare Repo bewusst auf einen fremden
+  // Nutzer, um genau das zu erzwingen, und prüft, dass server/git.ts trotzdem
+  // erfolgreich committet und pusht (per `-c safe.directory=...` pro Aufruf,
+  // ohne die globale Gitconfig zu verändern).
+  if (typeof process.getuid !== "function" || process.getuid() !== 0) {
+    t.skip("Braucht Root-Rechte für chown auf einen fremden Nutzer.");
+    return;
+  }
+  const { base, origin, cloneRepo } = initTestRepo();
+  try {
+    // Erst klonen (wie die im Image gebackene Arbeitskopie beim Docker-Build),
+    // dann erst den Dateibesitzer am Ziel-Repo ändern (wie ein Bind-Mount mit
+    // abweichender Ownership zur Laufzeit) - sonst würde schon der Test-Setup-
+    // Clone selbst an derselben Prüfung scheitern, nicht die zu testende Logik.
+    const cloneA = cloneRepo("cloneA");
+    execFileSync("chown", ["-R", "65534:65534", origin]);
+
+    const relPath = "wiki/foerdergeber/test-dubious-ownership.md";
+    mkdirSync(path.dirname(path.join(cloneA, relPath)), { recursive: true });
+    writeFileSync(path.join(cloneA, relPath), "# Test Dubious Ownership\n\n- Status: entwurf\n");
+
+    const result = await commitAndPushWikiChange({
+      relPath,
+      author: { name: "Person A", email: "a@example.invalid" },
+      message: "Wiki: dubious-ownership-Testfall",
+      cwd: cloneA,
+    });
+    assert.equal(result.pushed, true, "Push muss trotz fremdem Dateibesitzer am Ziel gelingen");
+
+    // Für die Verifikation per Plain-git zurück auf root chownen, damit die
+    // Lesebefehle unten nicht selbst an derselben Prüfung scheitern.
+    execFileSync("chown", ["-R", "0:0", origin]);
+    const authorLine = sh(origin, ["log", "-1", "--format=%an <%ae>", "main"]);
+    assert.equal(authorLine, "Person A <a@example.invalid>");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 test("commitAndPushWikiChange: zwei gleichzeitige Schreibvorgänge im selben Prozess werden serialisiert", async () => {
   const { base, origin, cloneRepo } = initTestRepo();
   try {

@@ -19,12 +19,14 @@ RUN npm ci
 # genau dieser Arbeitskopie und pusht von hier aus nach origin.
 COPY . .
 
-# Committer-Identität für den Bot-Committer (der eigentliche Autor pro Seite
-# kommt aus dem Token-Mapping und wird per `git commit --author` gesetzt, siehe
-# server/git.ts). Ohne diese Konfiguration lehnt git jeden Commit ab.
-RUN git config --global user.name "CCTP Wiki Bot" \
- && git config --global user.email "wiki-bot@cctp-wiki-suche.noreply" \
- && git config --global --add safe.directory /app
+# Keine globale Git-Identität und kein globales `safe.directory` hier: jeder
+# Git-Aufruf aus server/git.ts läuft mit einer eigenen, temporären
+# GIT_CONFIG_GLOBAL-Datei (Committer-Identität per GIT_COMMITTER_NAME/_EMAIL,
+# Autor per `--author`, vertraute Pfade per safe.directory) - eine hier
+# gesetzte globale Config würde dafür ohnehin verdeckt, siehe Kommentar in
+# server/git.ts. Das deckt auch ab, dass ein Bind-Mount (z. B.
+# scripts/verify-docker-e2e.sh unter Docker Desktop/WSL2) aus Containersicht
+# einem anderen Nutzer gehört ("dubious ownership").
 
 ENV NODE_ENV=production
 
