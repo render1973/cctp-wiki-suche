@@ -27,7 +27,8 @@ export type WikiPage = {
 };
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
-export const wikiRoot = path.resolve(serverDir, "..", "wiki");
+export const repoRoot = path.resolve(serverDir, "..");
+export const wikiRoot = path.join(repoRoot, "wiki");
 
 function parseTitle(body: string): string {
   const match = body.match(/^#\s+(.+)$/m);

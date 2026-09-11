@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync } from "node:fs";
+import { rmSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { searchWiki, listWikiPages } from "./search.js";
 import { getPages, BEREICHE } from "./corpus.js";
@@ -73,6 +73,58 @@ test("schreibe_wiki_seite -> such_cctp_wiki: neue Seite ist direkt nach dem Schr
     const hits = searchWiki(marker);
     assert.ok(hits.length > 0, "neu geschriebene Seite muss auffindbar sein");
     assert.ok(hits.some((hit) => hit.rohquellePfad === result.pfad));
+  } finally {
+    rmSync(path.join(process.cwd(), result.pfad), { force: true });
+  }
+});
+
+test("schreibe_wiki_seite: ohne autor-Parameter (stdio-Fall) bleibt Inhalt unverändert, keine Autor-Zeile", () => {
+  const result = schreibeWikiSeite({
+    bereich: "foerdergeber",
+    dateiname: `test-ohne-autor-${Date.now()}`,
+    inhalt: "# Test ohne Autor\n\n- Status: entwurf\n\nInhalt.\n",
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  try {
+    const geschrieben = readFileSync(path.join(process.cwd(), result.pfad), "utf-8");
+    assert.doesNotMatch(geschrieben, /^-\s*Autor:/im);
+  } finally {
+    rmSync(path.join(process.cwd(), result.pfad), { force: true });
+  }
+});
+
+test("schreibe_wiki_seite: mit autor-Parameter (HTTP-Fall) wird der aufgelöste Klarname als Autor eingesetzt", () => {
+  const result = schreibeWikiSeite({
+    bereich: "foerdergeber",
+    dateiname: `test-mit-autor-${Date.now()}`,
+    inhalt: "# Test mit Autor\n\n- Status: entwurf\n\nInhalt.\n",
+    autor: { name: "Kollegin Beispiel", email: "kollegin@example.invalid" },
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  try {
+    const geschrieben = readFileSync(path.join(process.cwd(), result.pfad), "utf-8");
+    assert.match(geschrieben, /^-\s*Autor:\s*Kollegin Beispiel$/im);
+  } finally {
+    rmSync(path.join(process.cwd(), result.pfad), { force: true });
+  }
+});
+
+test("schreibe_wiki_seite: eine vom Client mitgelieferte Autor-Zeile wird verworfen und durch das Token-Mapping ersetzt", () => {
+  const result = schreibeWikiSeite({
+    bereich: "foerdergeber",
+    dateiname: `test-autor-override-${Date.now()}`,
+    inhalt: "# Test Autor-Override\n\n- Status: entwurf\n- Autor: Behauptete Fremdperson\n\nInhalt.\n",
+    autor: { name: "Echte Person", email: "echt@example.invalid" },
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  try {
+    const geschrieben = readFileSync(path.join(process.cwd(), result.pfad), "utf-8");
+    assert.doesNotMatch(geschrieben, /Behauptete Fremdperson/);
+    assert.match(geschrieben, /^-\s*Autor:\s*Echte Person$/im);
+    assert.equal(geschrieben.match(/^-\s*Autor:/gim)?.length, 1, "genau eine Autor-Zeile erwartet");
   } finally {
     rmSync(path.join(process.cwd(), result.pfad), { force: true });
   }
