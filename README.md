@@ -35,6 +35,15 @@ Schreibt in eine neue, wachsende Wiki-Struktur unter `wiki/` im Repo-Root — ge
 - **Rückgabe:** Pfad der Datei, ob eine neue Seite entstand oder eine bestehende ergänzt wurde, eine kurze Bestätigung, sowie der Git-Status (`committed`, `pushed`, ggf. `hinweis`).
 - **Sofort auffindbar:** Eine so angelegte oder ergänzte Seite taucht ab dem nächsten Aufruf von `such_cctp_wiki` bzw. `liste_cctp_wiki_seiten` auf — es gibt keinen separaten Indexierungsschritt, jeder Aufruf liest `wiki/` frisch von der Platte.
 
+#### Wenn der Push zuverlässig fehlschlägt (`pushed: false`)
+
+Der Commit passiert immer lokal und geht nie verloren, auch wenn der Push scheitert. Zeigt `hinweis` wiederholt einen Auth-Fehler (z. B. `could not read Username for 'https://github.com'`), liegt das fast immer daran, dass MCP-Clients (Claude Desktop, aber auch dieses Repo im Test) dem gestarteten Server-Prozess **nicht** die volle Shell-Umgebung mitgeben — aus Sicherheitsgründen wird standardmässig nur eine feste, kleine Auswahl durchgereicht (`HOME`, `LOGNAME`, `PATH`, `SHELL`, `TERM`, `USER`). Alles, was der lokale Git-Zugang zusätzlich braucht (SSH-Agent-Socket, Proxy-Variablen, ein Credential-Helper, der auf weitere Umgebungsvariablen angewiesen ist), fehlt dann — unabhängig davon, wie der Push-Befehl selbst formuliert ist. Das lässt sich nicht im Code dieses Repos beheben, weil der Server-Prozess diese Variablen nie erhält.
+
+Zwei praktikable Abhilfen, je nach Git-Setup:
+
+- **HTTPS mit gespeichertem Zugangsdaten (empfohlen, meist am einfachsten):** `git config credential.helper` prüfen. Ist keiner gesetzt, z. B. `git config --global credential.helper store` (Token landet als Klartext in `~/.git-credentials` — für ein privates Gerät akzeptabel, sonst osxkeychain/manager-core nutzen). Das braucht nur `HOME`, was bereits durchgereicht wird.
+- **SSH:** entweder einen Schlüssel ohne Passphrase verwenden (kein Agent nötig), oder in der MCP-Server-Konfiguration den `env`-Block explizit setzen, z. B. `"env": { "SSH_AUTH_SOCK": "/tatsächlicher/pfad" }` (Pfad mit `echo $SSH_AUTH_SOCK` im eigenen Terminal ermitteln).
+
 ## Lokal starten
 
 Voraussetzungen: Node.js 20 oder neuer.
