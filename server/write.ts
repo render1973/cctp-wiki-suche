@@ -15,13 +15,32 @@ function extractStatus(inhalt: string): string | null {
   return match ? match[1].trim().toLowerCase() : null;
 }
 
+/**
+ * Entfernt eine vom Client mitgelieferte "- Autor:"-Zeile und setzt stattdessen
+ * den serverseitig aus dem Token aufgelösten Klarnamen ein. Der Autor darf
+ * nicht vom Aufrufer behauptet werden können (Authentizität des Token-Mappings).
+ */
+function injectAutor(inhalt: string, autorName: string): string {
+  const ohneAutorZeile = inhalt.replace(/^-\s*Autor:.*$\n?/gim, "");
+  const statusMatch = ohneAutorZeile.match(/^-\s*Status:.*$/im);
+  const autorZeile = `- Autor: ${autorName}`;
+  if (!statusMatch) {
+    return `${ohneAutorZeile.trimEnd()}\n${autorZeile}\n`;
+  }
+  const insertAt = statusMatch.index! + statusMatch[0].length;
+  return `${ohneAutorZeile.slice(0, insertAt)}\n${autorZeile}${ohneAutorZeile.slice(insertAt)}`;
+}
+
 export function schreibeWikiSeite(params: {
   bereich: string;
   dateiname: string;
   inhalt: string;
   ueberschreiben?: boolean;
+  /** Nur im HTTP-Modus gesetzt: aus dem Bearer-Token aufgelöste Identität. */
+  autor?: { name: string; email: string };
 }): SchreibeWikiSeiteResult {
-  const { bereich, dateiname, inhalt, ueberschreiben = false } = params;
+  const { bereich, dateiname, ueberschreiben = false, autor } = params;
+  const inhalt = autor ? injectAutor(params.inhalt, autor.name) : params.inhalt;
 
   if (!(BEREICHE as readonly string[]).includes(bereich)) {
     return {
