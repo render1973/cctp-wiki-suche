@@ -12,16 +12,16 @@ const server = new McpServer({
 
 server.tool(
   "such_cctp_wiki",
-  "Durchsucht die fünf freigegebenen CCTP-Wiki-Seiten und gibt pro Treffer Seitentitel, Status, Rohquelle-Pfad und den relevanten Textausschnitt zurück.",
+  "Durchsucht die fünf freigegebenen CCTP-Wiki-Seiten sowie alle Entwurfsseiten unter wiki/ (rekursiv, von schreibe_wiki_seite angelegt) und gibt pro Treffer Seitentitel, Status, Rohquelle-Pfad und den relevanten Textausschnitt zurück.",
   { query: z.string().trim().min(2).describe("Suchbegriff oder Frage an das Wiki") },
   async ({ query }) => {
-    const hits = searchWiki(query);
+    const hits = await searchWiki(query);
     if (hits.length === 0) {
       return {
         content: [
           {
             type: "text",
-            text: "Keine Treffer in den fünf freigegebenen Wiki-Seiten.",
+            text: "Keine Treffer im Wiki-Bestand (fünf freigegebene Seiten plus Entwürfe unter wiki/).",
           },
         ],
       };
@@ -34,18 +34,18 @@ server.tool(
 
 server.tool(
   "liste_cctp_wiki_seiten",
-  "Gibt die Tabelle aller fünf freigegebenen CCTP-Wiki-Seiten mit Titel, Datei und Status zurück.",
+  "Gibt die Tabelle aller CCTP-Wiki-Seiten mit Titel, Datei und Status zurück — die fünf freigegebenen Seiten sowie alle Entwurfsseiten unter wiki/ (rekursiv).",
   {},
   async () => {
     return {
-      content: [{ type: "text", text: JSON.stringify(listWikiPages(), null, 2) }],
+      content: [{ type: "text", text: JSON.stringify(await listWikiPages(), null, 2) }],
     };
   },
 );
 
 server.tool(
   "schreibe_wiki_seite",
-  "Legt eine neue Wiki-Entwurfsseite an oder ergänzt eine bestehende Seite (Titel-Treffer) im CCTP-Wiki. Überschreibt nie, sondern ergänzt mit einem datierten Update-Abschnitt. Neue Seiten erhalten immer Status 'entwurf' — nie automatisch 'geprueft' oder 'freigegeben'. Committet und pusht die Änderung.",
+  "Legt eine neue Wiki-Entwurfsseite an oder ergänzt eine bestehende Seite (Titel-Treffer) im CCTP-Wiki. Überschreibt nie, sondern ergänzt mit einem datierten Update-Abschnitt. Neue Seiten erhalten immer Status 'entwurf' — nie automatisch 'geprueft' oder 'freigegeben'. Committet und pusht die Änderung. Danach sofort über such_cctp_wiki / liste_cctp_wiki_seiten auffindbar.",
   {
     bereich: z
       .string()

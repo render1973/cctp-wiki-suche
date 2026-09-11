@@ -1,6 +1,6 @@
 # CCTP Wiki-Suche
 
-Lokaler MCP-Server (stdio, [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk)) für die fünf freigegebenen Wiki-Seiten des CCTP Knowledge Lab. Der Server liefert nur Rohtreffer aus diesem Bestand — Seitentitel, Status, Rohquelle-Pfad und Textausschnitt. Das Formulieren der Antwort übernimmt der MCP-Client (z. B. Claude Desktop oder Claude Code), nicht dieses Repo.
+Lokaler MCP-Server (stdio, [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk)) für das CCTP Wiki: die fünf freigegebenen Wiki-Seiten des CCTP Knowledge Lab plus alle Entwurfsseiten, die über `schreibe_wiki_seite` laufend unter `wiki/` entstehen. Der Server liefert nur Rohtreffer aus diesem Bestand — Seitentitel, Status, Rohquelle-Pfad und Textausschnitt. Das Formulieren der Antwort übernimmt der MCP-Client (z. B. Claude Desktop oder Claude Code), nicht dieses Repo.
 
 CDE und DMS bleiben für verbindliche Projekt-, Rechts- und Normunterlagen führend.
 
@@ -14,25 +14,26 @@ CDE und DMS bleiben für verbindliche Projekt-, Rechts- und Normunterlagen führ
 | Demo 2026-08-15: Chat, Dateisuche, Wiki | `server/wiki/demo.md` |
 | Knowledge Architecture Sprint | `server/wiki/sprint.md` |
 
-Status der Seiten: `freigegeben`. Status und fachliche Prüfung setzt allein Thomas Heim.
+Status der fünf festen Seiten: `freigegeben`. Status und fachliche Prüfung setzt allein Thomas Heim.
 
-Der Rohquelle-Pfad, den `such_cctp_wiki` zurückgibt, zeigt auf die unveränderte Originalquelle im Roharchiv (`00-roharchiv/…`) — nicht auf die Wiki-Seite selbst. Das ist die eigentliche Belegstelle; die Wiki-Seite ist nur die daraus verdichtete Fassung.
+Der Rohquelle-Pfad, den `such_cctp_wiki` zurückgibt, zeigt bei den fünf festen Seiten auf die unveränderte Originalquelle im Roharchiv (`00-roharchiv/…`) — nicht auf die Wiki-Seite selbst. Das ist die eigentliche Belegstelle; die Wiki-Seite ist nur die daraus verdichtete Fassung. Bei Seiten unter `wiki/` (siehe unten) gibt es keine separate Roharchiv-Quelle — dort zeigt der Rohquelle-Pfad auf die Wiki-Datei selbst, weil sie der primäre Eintrag ist.
 
 ## Tools
 
-- `such_cctp_wiki(query: string)` — durchsucht die fünf Seiten und gibt pro Treffer Titel, Status, Rohquelle-Pfad (im Roharchiv) und den relevanten Textausschnitt zurück.
-- `liste_cctp_wiki_seiten()` — gibt die Tabelle aller fünf Seiten mit Titel, Datei und Status zurück.
-- `schreibe_wiki_seite(bereich, titel, inhalt, autor?)` — legt eine neue Wiki-Entwurfsseite an oder ergänzt eine bestehende Seite bei Titel-Treffer. Details siehe unten.
+- `such_cctp_wiki(query: string)` — durchsucht die fünf festen Seiten **und** rekursiv alle Seiten unter `wiki/` (inkl. Unterordnern wie `entscheidungen/`) und gibt pro Treffer Titel, **Status**, Rohquelle-Pfad und den relevanten Textausschnitt zurück. Der Status verrät, was geprüft ist (`freigegeben`) und was nicht (`entwurf` oder was auch immer in der Datei steht).
+- `liste_cctp_wiki_seiten()` — gibt die Tabelle aller Seiten mit Titel, Datei und Status zurück: die fünf festen plus alle unter `wiki/`.
+- `schreibe_wiki_seite(bereich, titel, inhalt, autor?)` — legt eine neue Wiki-Entwurfsseite unter `wiki/` an oder ergänzt eine bestehende Seite bei Titel-Treffer. Details siehe unten.
 
 ### `schreibe_wiki_seite` im Detail
 
-Schreibt in eine neue, separate Wiki-Struktur unter `wiki/` im Repo-Root — bewusst getrennt vom festen Fünf-Seiten-Bestand oben, den `such_cctp_wiki` durchsucht. Diese neuen Seiten fliessen (noch) nicht in die Suche ein; das ist ein bewusst offener, späterer Schritt.
+Schreibt in eine neue, wachsende Wiki-Struktur unter `wiki/` im Repo-Root — getrennt vom festen Fünf-Seiten-Bestand in `server/wiki/`, aber von Anfang an Teil von `such_cctp_wiki` und `liste_cctp_wiki_seiten`.
 
 - **Neue Seite:** wird unter `wiki/<bereich>/<titel-als-dateiname>.md` angelegt, mit Titel, Datum, Autor:in und Status `entwurf`. Der Server setzt nie automatisch `geprueft` oder `freigegeben` — das bleibt Menschenarbeit, wie beim übrigen Bestand.
 - **Bestehende Seite (exakter Titel-Treffer, irgendwo unter `wiki/`):** wird nicht überschrieben. Stattdessen wird ein datierter Abschnitt `## Update <Datum> (<Autor:in>)` angehängt, der den bisherigen Stand referenziert und den neuen Inhalt explizit als Ergänzung oder Widerspruch kennzeichnet — nach dem Muster „Stand [Datum]: … Update [Datum]: … — Widerspruch/Weiterentwicklung.“
 - **Autor:in:** wird, falls nicht angegeben, aus dem lokalen Git-Kontext abgeleitet (`git config user.name`, sonst `user.email`) — nicht erfragt.
 - **Nach dem Schreiben:** committet und pusht der Server die Änderung automatisch (nur die betroffene Datei, nicht andere offene Änderungen im Repo). Schlägt der Push fehl (z. B. kein Remote, kein Netz), bleibt der Commit lokal stehen und die Antwort weist darauf hin.
 - **Rückgabe:** Pfad der Datei, ob eine neue Seite entstand oder eine bestehende ergänzt wurde, eine kurze Bestätigung, sowie der Git-Status (`committed`, `pushed`, ggf. `hinweis`).
+- **Sofort auffindbar:** Eine so angelegte oder ergänzte Seite taucht ab dem nächsten Aufruf von `such_cctp_wiki` bzw. `liste_cctp_wiki_seiten` auf — es gibt keinen separaten Indexierungsschritt, jeder Aufruf liest `wiki/` frisch von der Platte.
 
 ## Lokal starten
 

@@ -1,18 +1,10 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { DEFAULT_REPO_ROOT, findMarkdownFiles, extractTitle, wikiRootFor } from "./wiki-fs.js";
 
 const execFileAsync = promisify(execFile);
-
-const SERVER_DIR = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_REPO_ROOT = path.resolve(SERVER_DIR, "..");
-
-// Neue, wachsende Wiki-Struktur unter <repo>/wiki/. Bewusst getrennt vom
-// festen Fünf-Seiten-Bestand in server/wiki/, den corpus.ts einliest — diese
-// Seiten hier sind (noch) nicht Teil der such_cctp_wiki-Suche.
-const WIKI_DIRNAME = "wiki";
 
 export type GitRunner = (
   repoRoot: string,
@@ -81,30 +73,6 @@ function sanitizeBereich(bereich: string): string {
     throw new Error("Bereich ist leer oder enthält keine gültigen Zeichen.");
   }
   return segments.join("/");
-}
-
-async function findMarkdownFiles(dir: string): Promise<string[]> {
-  let entries;
-  try {
-    entries = await fs.readdir(dir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-  const files: string[] = [];
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...(await findMarkdownFiles(full)));
-    } else if (entry.isFile() && entry.name.endsWith(".md")) {
-      files.push(full);
-    }
-  }
-  return files;
-}
-
-function extractTitle(markdown: string): string | undefined {
-  const match = markdown.match(/^#\s+(.+)$/m);
-  return match?.[1]?.trim();
 }
 
 async function findExistingPage(
@@ -200,7 +168,7 @@ export async function schreibeWikiSeite(
 
   const repoRoot = opts.repoRoot ?? DEFAULT_REPO_ROOT;
   const git = opts.git ?? defaultGitRunner;
-  const wikiRoot = path.join(repoRoot, WIKI_DIRNAME);
+  const wikiRoot = wikiRootFor(repoRoot);
 
   const autor = params.autor?.trim() || (await ermittleAutor(repoRoot, git));
   const datum = heute();
