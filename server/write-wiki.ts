@@ -38,8 +38,19 @@ function heute(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Bei einem fehlgeschlagenen execFile-Aufruf steckt die eigentlich
+// aussagekräftige Diagnose in err.stderr (z. B. "could not read Username für
+// 'https://github.com'") — err.message ist meist nur "Command failed: git …".
+// Nur die erste Zeile von err.message zu nehmen (frühere Version) hat genau
+// diese Diagnose verschluckt und die Fehlermeldung nutzlos gemacht.
 function errorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message.trim().split("\n")[0];
+  if (err && typeof err === "object") {
+    const withStderr = err as { stderr?: unknown; message?: unknown };
+    if (typeof withStderr.stderr === "string" && withStderr.stderr.trim()) {
+      return withStderr.stderr.trim().slice(0, 500);
+    }
+  }
+  if (err instanceof Error) return err.message.trim().slice(0, 500);
   return String(err);
 }
 
@@ -214,6 +225,17 @@ export async function schreibeWikiSeite(
   };
 }
 
+// Liefert den Namen des aktuell ausgecheckten Branches — nie "HEAD" (das
+// hiesse detached HEAD, dafür gibt es keinen sinnvollen Push-Ziel-Branch).
+async function ermittleBranch(repoRoot: string, git: GitRunner): Promise<string> {
+  const { stdout } = await git(repoRoot, ["rev-parse", "--abbrev-ref", "HEAD"]);
+  const branch = stdout.trim();
+  if (!branch || branch === "HEAD") {
+    throw new Error("Kein Branch aktiv (detached HEAD) — Push nicht möglich.");
+  }
+  return branch;
+}
+
 async function commitUndPush(
   repoRoot: string,
   git: GitRunner,
@@ -233,19 +255,20 @@ async function commitUndPush(
     return { committed: false, pushed: false, hinweis: `Commit fehlgeschlagen: ${errorMessage(err)}` };
   }
 
+  // Nie auf eine bereits bestehende Tracking-Konfiguration verlassen ("git
+  // push" ohne Argumente) — im MCP-Server-Subprozess kam die offenbar nicht
+  // zuverlässig an und führte wiederholt zu "kein Upstream-Branch gesetzt".
+  // Stattdessen bei jedem Push den tatsächlichen Branch-Namen frisch
+  // ermitteln und explizit mit Ziel angeben.
   try {
-    await git(repoRoot, ["push"]);
+    const branch = await ermittleBranch(repoRoot, git);
+    await git(repoRoot, ["push", "--set-upstream", "origin", `${branch}:${branch}`]);
     return { committed: true, pushed: true };
-  } catch {
-    try {
-      await git(repoRoot, ["push", "--set-upstream", "origin", "HEAD"]);
-      return { committed: true, pushed: true };
-    } catch (err2) {
-      return {
-        committed: true,
-        pushed: false,
-        hinweis: `Commit lokal erstellt, Push fehlgeschlagen: ${errorMessage(err2)}`,
-      };
-    }
+  } catch (err) {
+    return {
+      committed: true,
+      pushed: false,
+      hinweis: `Commit lokal erstellt, Push fehlgeschlagen: ${errorMessage(err)}`,
+    };
   }
 }

@@ -20,6 +20,25 @@ async function tempRepo(): Promise<string> {
   return dir;
 }
 
+// Für den Push-Test reicht ein lokales Repo ohne Remote nicht — dort schlägt
+// jeder Push zwangsläufig fehl, egal wie robust der Code ist. Hier bekommt
+// das Arbeits-Repo ein echtes (lokales) bare Remote, gegen das tatsächlich
+// gepusht werden kann, genau wie gegen GitHub im Betrieb.
+async function tempRepoMitRemote(): Promise<{ repoRoot: string; remoteDir: string }> {
+  const remoteDir = await fs.mkdtemp(path.join(os.tmpdir(), "wiki-write-remote-"));
+  await execFileAsync("git", ["-C", remoteDir, "init", "--quiet", "--bare"]);
+
+  const repoRoot = await tempRepo();
+  // Erster Commit + Branch nötig, bevor "rev-parse --abbrev-ref HEAD" einen
+  // echten Branch-Namen liefert (sonst detached/leer).
+  await fs.writeFile(path.join(repoRoot, "README.md"), "# Test\n", "utf-8");
+  await execFileAsync("git", ["-C", repoRoot, "add", "README.md"]);
+  await execFileAsync("git", ["-C", repoRoot, "commit", "--quiet", "-m", "init"]);
+  await execFileAsync("git", ["-C", repoRoot, "remote", "add", "origin", remoteDir]);
+
+  return { repoRoot, remoteDir };
+}
+
 test("schreibe_wiki_seite: legt neue Seite mit Status 'entwurf' an und committet sie", async () => {
   const repoRoot = await tempRepo();
   const result = await schreibeWikiSeite({
@@ -97,4 +116,44 @@ test("schreibe_wiki_seite: verweigert Bereich, der aus dem Wiki-Ordner ausbricht
   // scheitern — Ergebnis muss trotzdem unter wiki/ liegen.
   assert.ok(result.pfad.startsWith("wiki/"), `Pfad ${result.pfad} muss innerhalb von wiki/ bleiben`);
   assert.ok(!result.pfad.includes(".."));
+});
+
+test("schreibe_wiki_seite: mehrere Schreibvorgänge hintereinander pushen jedes Mal erfolgreich", async () => {
+  const { repoRoot, remoteDir } = await tempRepoMitRemote();
+
+  // Bewusst mehrfach hintereinander im selben Testlauf: der ursprüngliche
+  // Fehler ("kein Upstream-Branch gesetzt") trat laut Praxis-Testläufen
+  // wiederholt auf, nicht nur beim ersten Push — ein einzelner Aufruf hätte
+  // das nicht zuverlässig aufgedeckt.
+  const ergebnisse = [];
+  for (let i = 1; i <= 3; i++) {
+    const result = await schreibeWikiSeite(
+      {
+        bereich: "forschung",
+        titel: `Push-Test Seite ${i}`,
+        inhalt: `Inhalt von Push-Test Seite ${i}.`,
+        autor: "Thomas Heim",
+      },
+      { repoRoot },
+    );
+    ergebnisse.push(result);
+  }
+
+  for (const [i, result] of ergebnisse.entries()) {
+    assert.equal(result.aktion, "erstellt");
+    assert.ok(
+      result.git.pushed,
+      `Push Nr. ${i + 1} muss erfolgreich sein, aber: ${result.git.hinweis ?? "(kein Hinweis)"}`,
+    );
+    assert.ok(result.git.committed);
+  }
+
+  // Nicht nur der lokale Rückgabewert zählt — die Commits müssen tatsächlich
+  // im (bare) Remote angekommen sein.
+  const remoteLog = await execFileAsync("git", ["-C", remoteDir, "log", "--oneline"]);
+  for (let i = 1; i <= 3; i++) {
+    assert.match(remoteLog.stdout, new RegExp(`Push-Test Seite ${i}`));
+  }
+  // init-Commit + 3 Wiki-Commits
+  assert.equal(remoteLog.stdout.trim().split("\n").length, 4);
 });
