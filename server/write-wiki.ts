@@ -1,18 +1,10 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { DEFAULT_REPO_ROOT, findMarkdownFiles, extractTitle, wikiRootFor } from "./wiki-fs.js";
 
 const execFileAsync = promisify(execFile);
-
-const SERVER_DIR = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_REPO_ROOT = path.resolve(SERVER_DIR, "..");
-
-// Neue, wachsende Wiki-Struktur unter <repo>/wiki/. Bewusst getrennt vom
-// festen Fünf-Seiten-Bestand in server/wiki/, den corpus.ts einliest — diese
-// Seiten hier sind (noch) nicht Teil der such_cctp_wiki-Suche.
-const WIKI_DIRNAME = "wiki";
 
 export type GitRunner = (
   repoRoot: string,
@@ -46,8 +38,19 @@ function heute(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Bei einem fehlgeschlagenen execFile-Aufruf steckt die eigentlich
+// aussagekräftige Diagnose in err.stderr (z. B. "could not read Username für
+// 'https://github.com'") — err.message ist meist nur "Command failed: git …".
+// Nur die erste Zeile von err.message zu nehmen (frühere Version) hat genau
+// diese Diagnose verschluckt und die Fehlermeldung nutzlos gemacht.
 function errorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message.trim().split("\n")[0];
+  if (err && typeof err === "object") {
+    const withStderr = err as { stderr?: unknown; message?: unknown };
+    if (typeof withStderr.stderr === "string" && withStderr.stderr.trim()) {
+      return withStderr.stderr.trim().slice(0, 500);
+    }
+  }
+  if (err instanceof Error) return err.message.trim().slice(0, 500);
   return String(err);
 }
 
@@ -81,30 +84,6 @@ function sanitizeBereich(bereich: string): string {
     throw new Error("Bereich ist leer oder enthält keine gültigen Zeichen.");
   }
   return segments.join("/");
-}
-
-async function findMarkdownFiles(dir: string): Promise<string[]> {
-  let entries;
-  try {
-    entries = await fs.readdir(dir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-  const files: string[] = [];
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...(await findMarkdownFiles(full)));
-    } else if (entry.isFile() && entry.name.endsWith(".md")) {
-      files.push(full);
-    }
-  }
-  return files;
-}
-
-function extractTitle(markdown: string): string | undefined {
-  const match = markdown.match(/^#\s+(.+)$/m);
-  return match?.[1]?.trim();
 }
 
 async function findExistingPage(
@@ -200,7 +179,7 @@ export async function schreibeWikiSeite(
 
   const repoRoot = opts.repoRoot ?? DEFAULT_REPO_ROOT;
   const git = opts.git ?? defaultGitRunner;
-  const wikiRoot = path.join(repoRoot, WIKI_DIRNAME);
+  const wikiRoot = wikiRootFor(repoRoot);
 
   const autor = params.autor?.trim() || (await ermittleAutor(repoRoot, git));
   const datum = heute();
@@ -246,6 +225,17 @@ export async function schreibeWikiSeite(
   };
 }
 
+// Liefert den Namen des aktuell ausgecheckten Branches — nie "HEAD" (das
+// hiesse detached HEAD, dafür gibt es keinen sinnvollen Push-Ziel-Branch).
+async function ermittleBranch(repoRoot: string, git: GitRunner): Promise<string> {
+  const { stdout } = await git(repoRoot, ["rev-parse", "--abbrev-ref", "HEAD"]);
+  const branch = stdout.trim();
+  if (!branch || branch === "HEAD") {
+    throw new Error("Kein Branch aktiv (detached HEAD) — Push nicht möglich.");
+  }
+  return branch;
+}
+
 async function commitUndPush(
   repoRoot: string,
   git: GitRunner,
@@ -265,19 +255,20 @@ async function commitUndPush(
     return { committed: false, pushed: false, hinweis: `Commit fehlgeschlagen: ${errorMessage(err)}` };
   }
 
+  // Nie auf eine bereits bestehende Tracking-Konfiguration verlassen ("git
+  // push" ohne Argumente) — im MCP-Server-Subprozess kam die offenbar nicht
+  // zuverlässig an und führte wiederholt zu "kein Upstream-Branch gesetzt".
+  // Stattdessen bei jedem Push den tatsächlichen Branch-Namen frisch
+  // ermitteln und explizit mit Ziel angeben.
   try {
-    await git(repoRoot, ["push"]);
+    const branch = await ermittleBranch(repoRoot, git);
+    await git(repoRoot, ["push", "--set-upstream", "origin", `${branch}:${branch}`]);
     return { committed: true, pushed: true };
-  } catch {
-    try {
-      await git(repoRoot, ["push", "--set-upstream", "origin", "HEAD"]);
-      return { committed: true, pushed: true };
-    } catch (err2) {
-      return {
-        committed: true,
-        pushed: false,
-        hinweis: `Commit lokal erstellt, Push fehlgeschlagen: ${errorMessage(err2)}`,
-      };
-    }
+  } catch (err) {
+    return {
+      committed: true,
+      pushed: false,
+      hinweis: `Commit lokal erstellt, Push fehlgeschlagen: ${errorMessage(err)}`,
+    };
   }
 }
