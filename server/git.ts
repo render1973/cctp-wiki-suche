@@ -9,6 +9,8 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { repoRoot } from "./corpus.js";
 
 const execFileAsync = promisify(execFile);
@@ -34,11 +36,73 @@ async function git(args: string[], options: { cwd?: string; env?: NodeJS.Process
 }
 
 /**
+ * Railways Docker-Build liefert kein `.git` in den Build-Context: Railway
+ * baut aus einem selbst erzeugten Quell-Archiv, nicht aus einem echten
+ * `git clone` - das Dockerfile hier (`COPY . .`) geht implizit vom letzteren
+ * aus. Ergebnis: `git`-Aufrufe im Container schlagen mit "not a git
+ * repository" fehl, obwohl Docker lokal (echter `docker build` aus einem
+ * Git-Klon) einwandfrei funktioniert.
+ *
+ * Fallback: fehlt `.git` beim ersten Zugriff, wird das Repo hier neu
+ * initialisiert und von `origin` auf den Ziel-Branch gebracht. Remote/Branch
+ * kommen aus Railways automatisch gesetzten `RAILWAY_GIT_*`-Variablen
+ * (https://docs.railway.com/reference/variables#railway-provided-variables),
+ * überschreibbar via `WIKI_GIT_REMOTE_URL`/`WIKI_GIT_BRANCH` für andere
+ * Hosting-Umgebungen. Nur einmal pro Prozess nötig; ein Fehlschlag wird nicht
+ * gecacht, damit ein späterer Aufruf (z. B. nach kurzzeitigem DNS-Problem)
+ * es erneut versuchen kann.
+ */
+let repoBootstrap: Promise<void> | null = null;
+function ensureRepoBootstrapped(cwd: string): Promise<void> {
+  if (existsSync(path.join(cwd, ".git"))) return Promise.resolve();
+  if (!repoBootstrap) {
+    repoBootstrap = bootstrapRepo(cwd).catch((error) => {
+      repoBootstrap = null;
+      throw error;
+    });
+  }
+  return repoBootstrap;
+}
+
+async function bootstrapRepo(cwd: string): Promise<void> {
+  const remoteUrl = resolveBootstrapRemoteUrl();
+  const branch = resolveBootstrapBranch();
+  await git(["init"], { cwd });
+  await git(["remote", "add", "origin", remoteUrl], { cwd });
+  await git(["fetch", "--depth", "1", "origin", branch], { cwd });
+  await git(["checkout", "--force", "-B", branch, "FETCH_HEAD"], { cwd });
+}
+
+function resolveBootstrapRemoteUrl(): string {
+  const explicit = process.env.WIKI_GIT_REMOTE_URL?.trim();
+  if (explicit) return explicit;
+  const owner = process.env.RAILWAY_GIT_REPO_OWNER?.trim();
+  const repo = process.env.RAILWAY_GIT_REPO_NAME?.trim();
+  if (owner && repo) return `https://github.com/${owner}/${repo}.git`;
+  throw new GitWriteError(
+    "Kein .git im Container gefunden und keine Remote-URL bestimmbar - WIKI_GIT_REMOTE_URL setzen " +
+      "oder sicherstellen, dass Railway RAILWAY_GIT_REPO_OWNER/RAILWAY_GIT_REPO_NAME liefert.",
+  );
+}
+
+function resolveBootstrapBranch(): string {
+  const explicit = process.env.WIKI_GIT_BRANCH?.trim();
+  if (explicit) return explicit;
+  const railway = process.env.RAILWAY_GIT_BRANCH?.trim();
+  if (railway) return railway;
+  throw new GitWriteError(
+    "Kein .git im Container gefunden und kein Ziel-Branch bestimmbar - WIKI_GIT_BRANCH setzen " +
+      "oder sicherstellen, dass Railway RAILWAY_GIT_BRANCH liefert.",
+  );
+}
+
+/**
  * Ermittelt den aktuell ausgecheckten Branch. Bei detached HEAD (z. B. ein
  * flacher Checkout ohne expliziten Branch-Bezug) wird die Umgebungsvariable
  * WIKI_GIT_BRANCH als Fallback verlangt statt einen Branch zu erraten.
  */
 export async function getCurrentBranch(cwd: string = repoRoot): Promise<string> {
+  await ensureRepoBootstrapped(cwd);
   const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd });
   if (branch !== "HEAD") return branch;
   const fallback = process.env.WIKI_GIT_BRANCH?.trim();
