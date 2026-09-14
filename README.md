@@ -49,6 +49,7 @@ Status der bestehenden Seiten: `freigegeben`.
 ## Tools
 
 - `such_cctp_wiki(query: string)` — durchsucht alle sieben Bereiche und gibt pro Treffer Titel, Bereich, Status, Rohquelle-Pfad und den relevanten Textausschnitt zurück.
+- `such_cctp_vault(query: string, bereich?: string)` — durchsucht **lesend** den Obsidian-Vault `cctp-knowledge-lab` (`10-wiki/`, ~600 Dateien: 180 Forschungsprojekte, ~436 Personen-Seiten, Lehre, Methoden-Katalog). Gibt Treffer im selben Format wie `such_cctp_wiki` zurück, optional gefiltert auf einen der Vault-Bereiche (`forschung`, `lehre`, `personen`, `entscheidungen`, `buero`, `dienstleistungen`, `projekte`). Reiner Lesezugriff — siehe [Vault-Anbindung](#vault-anbindung-such_cctp_vault) unten.
 - `liste_cctp_wiki_seiten(bereich?: string)` — gibt die Tabelle aller Seiten mit Titel, Bereich, Datei und Status zurück, optional auf einen Bereich gefiltert.
 - `schreibe_wiki_seite(bereich, dateiname, inhalt, ueberschreiben?)` — schreibt eine neue Seite unter `wiki/<bereich>/<dateiname>.md`. `bereich` muss einer der sieben oben genannten sein; `inhalt` ist der vollständige Markdown-Text inkl. `# Titel` und Metadaten-Liste. Status `geprueft`/`freigegeben` wird abgelehnt. Bestehende Dateien werden nur mit `ueberschreiben: true` überschrieben.
   - **Im HTTP-Modus** wird der Autor serverseitig aus dem Bearer-Token bestimmt und als `- Autor: <Klarname>` in die Seite eingesetzt; eine selbst mitgelieferte Autor-Zeile wird verworfen. Anschliessend committet und pusht der Server automatisch (siehe unten). **Im stdio-Modus** passiert das nicht — kein Autor-Feld, kein automatischer Commit/Push, wie bisher.
@@ -64,6 +65,22 @@ npm start   # startet den MCP-Server auf stdio (zum manuellen Testen)
 ```
 
 `npm start` allein ist zum Ausprobieren gedacht — im Alltag startet der MCP-Client (Claude Desktop / Claude Code) den Server selbst, siehe unten.
+
+## Vault-Anbindung (`such_cctp_vault`)
+
+`such_cctp_vault` liest zusätzlich, rein lesend, den separaten Obsidian-Vault-Checkout `cctp-knowledge-lab` (Repo `render1973/cctp-knowledge-lab-vault`) — direkt von dessen eigenem Ordner, ohne Kopie, ohne Synchronisation, ohne Zusammenlegen der beiden Repos. `schreibe_wiki_seite` schreibt weiterhin ausschliesslich in das eigene `wiki/` dieses Repos; der Vault hat seine eigene Governance (Vorschau-vor-Commit, Status nur durch Thomas Heim, PR-Workflow über Claude Code).
+
+Gelesen wird ausschliesslich `10-wiki/` (die sieben Bereiche oben), nie `00-roharchiv` (Rohquellen) oder `99-admin` (Vault-interne Verwaltung).
+
+**Pfad zum Vault-Checkout:** Standardmässig wird der Geschwisterordner `cctp-knowledge-lab` neben diesem Repo erwartet (z. B. `…/Documents/cctp-wiki-suche` und `…/Documents/cctp-knowledge-lab` nebeneinander). Liegt der Checkout woanders, die Umgebungsvariable `CCTP_VAULT_PATH` auf den Vault-Wurzelordner setzen (den Ordner, der `10-wiki/` enthält), z. B.:
+
+```bash
+export CCTP_VAULT_PATH=/pfad/zu/cctp-knowledge-lab
+```
+
+Ist der Vault-Ordner nicht auffindbar, liefert `such_cctp_vault` eine klare Fehlermeldung mit dem geprüften Pfad statt eines Absturzes.
+
+**Nur lokal (stdio):** Für den gehosteten HTTP-Server (Railway) ist die Vault-Anbindung aktuell **nicht** vorgesehen — der Container müsste dafür zwei Git-Repos gleichzeitig bereithalten, was neue Komplexität gegenüber dem heutigen Single-Repo-Bootstrap bedeutet. Bewusst nicht Teil dieses Schritts.
 
 ## In Claude Desktop einbinden
 
