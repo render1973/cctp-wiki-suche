@@ -1,47 +1,53 @@
-# Praxisbeispiel: Cartesian by FORMAS.AI — Anything to 3D
+# Nachbau-Analyse: Cartesian by FORMAS.AI — Anything to 3D
 
 - Status: entwurf
 - Autor: Thomas Heim
-- Typ: praxisbeispiel
-- Themencluster: KI-Agenten, Computational Design, 3D-Modellierung, BIM, Entwurf
+- Typ: nachbau-analyse
+- Themencluster: KI-Agenten, Computational Design, 3D-Generierung, Spatial Intelligence
 - Quelle: LinkedIn-Post Carlos Bañón (FORMAS.AI), 2026-09-14, Screen-Recording
 - Erfasst: 2026-09-14
-- Tags: cartesian, formas-ai, 3d-generierung, rhino, ifc, sketchup, openai, entwurf, spatial-intelligence
+- Verwendung: intern / RaumBilder.ai
+- Tags: cartesian, formas-ai, 3d-generierung, openai-astra, nachbau, spatial-intelligence, rhino, ifc
 
-## Was wird gezeigt
+## Was das Tool macht (Beobachtung aus Demo)
 
-Carlos Bañón (Associate Professor SUTD, Co-Founder FORMAS.AI, lehrte am MIT) kündigt auf LinkedIn den Preview-Launch von **Cartesian by FORMAS.AI** an — ein KI-gestütztes Tool, das beliebige Eingaben in strukturierte, editierbare 3D-Geometrie überführt.
+**Cartesian by FORMAS.AI** überführt beliebige Eingaben (Foto, Skizze, Zeichnung, Bestandsmodell, Adresse) in strukturierte, editierbare 3D-Geometrie — mit räumlichem Verständnis für architektonische Beziehungen (Fenster↔Wand, Öffnung↔Raumfolge).
 
-Website: [cartesianbyformas.com](https://www.cartesianbyformas.com)
-Waitlist: [lnkd.in/g7Mw-ekM](https://lnkd.in/g7Mw-ekM)
+Demo-Sequenzen:
+- **LOOK AROUND** — 360°-Navigation in generiertem Innenraum
+- **GO INSIDE** — Transition Aussenkontext → Innenraum
+- **DRAFT ANGLE** — 3D-Produktmodell mit Fertigungsanalyse (Neigungswinkel farbcodiert)
 
-## Funktionsprinzip
+Export: Rhino, SketchUp, DWG, IFC (geplant laut Post)
 
-| Komponente | Beschreibung |
+## Vermutete Architektur (Reverse Engineering)
+
+| Schicht | Wahrscheinliche Technologie |
 |---|---|
-| **Input** | Foto, Skizze, Zeichnung, Bestandsmodell, Stadtort, Typologie |
-| **KI-Basis** | OpenAI Astra (räumliches Verstehen) + FORMAS.AI-Expertise in Architektur und Digital Fabrication |
-| **Verarbeitung** | KI interpretiert räumliche Beziehungen (Fenster↔Wand, Öffnung↔Raumfolge) und erzeugt semantisch strukturierte 3D-Geometrie |
-| **Interaktion** | Intention sprachlich eingeben, Modell skizzieren, iterieren — Edit-History bleibt erhalten |
-| **Output** | Strukturierte, editierbare 3D-Geometrie; visuell navigierbar (Look Around / Go Inside) |
-| **Export** | Rhino, SketchUp, DWG, IFC (geplant) |
+| **Räumliches Verstehen** | OpenAI Astra (explizit erwähnt) — multimodales Modell mit 3D-Spatial-Reasoning |
+| **3D-Rekonstruktion** | NeRF / Gaussian Splatting oder strukturiertes Mesh aus Tiefenschätzung |
+| **Semantische Struktur** | LLM-gesteuerte Bauteil-Klassifikation (Wand, Öffnung, Decke…) |
+| **Geometrie-Engine** | Wahrscheinlich Three.js / WebGL für Browser-Viewer + proprietärer Mesh-Builder |
+| **360°-Navigation** | Equirectangular Rendering oder Cubemap aus dem 3D-Modell |
+| **Export** | Open3D / Rhino-API / IFC-Bibliothek (ifcopenshell o.ä.) |
 
-## Demo-Sequenzen im Preview-Video
+## Machbare Vereinfachung (Nachbau-Scope)
 
-| Label | Inhalt |
-|---|---|
-| **LOOK AROUND** | 360°-Navigation in einem Innenraum (Lobby/Atrium) — immersive Visualisierung aus dem Modell heraus |
-| **GO INSIDE** | Übergang von städtebaulichem Aussenkontext ins Gebäudeinnere |
-| **DRAFT ANGLE** | 3D-Produktmodell (Mütze), farbcodiert nach Neigungswinkel — zeigt Potenzial für Fertigungsplanung/DfM |
+Statt Full-Stack: fokussierter Nachbau auf den AEC-Kernfall.
 
-## Relevanz für CCTP
+**Input:** Grundriss-Foto oder einfache Skizze
+**Pipeline:**
+1. GPT-4o Vision → Raumstruktur extrahieren (Wände, Öffnungen, Raumtypen) als JSON
+2. JSON → parametrisches 3D-Modell (Rhino/Grasshopper via API oder Three.js im Browser)
+3. Ausgabe: IFC oder DXF zum Weiterarbeiten
 
-- **Rhino-Export und IFC** direkt adressiert → Anschluss an BIM-Workflows der Baubranche
-- Schliesst den Kreis zu den agentischen Rhino-Workflows (→ [[praxisbeispiel-rhino-agent-automated-zoning]]): dort Python-Agenten in Rhino, hier KI als Eingangsschicht vor Rhino
-- Für Lehre (CAS Digital Construction) interessant als Beispiel für den Einstiegspunkt "Anything"-Ansatz: kein CAD-Vorwissen als Voraussetzung für 3D-Modell
-- Bereich Digital Fabrication / 3D-Druck explizit erwähnt — relevant für Robotik-/Fertigungsthemen am CCTP
-- Spatial Intelligence als Begriff und Konzept (OpenAI Astra) — neue Kategorie neben Text- und Bildgenerierung
+**Differenzierung für RaumBilder.ai:**
+- Schweizer Baurecht / Normen als Constraints einbauen
+- Fokus auf Bestandsaufnahme (Foto → Grundriss → Modell) statt Neubau-Entwurf
 
-## Einordnung
+## Offene Fragen / nächste Schritte
 
-Cartesian steht in einer Reihe von Tools (neben Spline, Vizcom, Higgsfield 3D), die den Übergang von 2D-Inputs zu editierbarer 3D-Geometrie anstreben. Der Unterschied: FORMAS.AI kommt aus der Architektur- und Fertigungspraxis (nicht aus Gaming/VFX) und adressiert explizit professionelle AEC-Workflows (IFC, Rhino). Noch in der Preview-Phase; Waitlist offen (Stand 14.9.2026).
+- [ ] OpenAI Astra API-Verfügbarkeit prüfen (noch nicht öffentlich, Stand 9.2026)
+- [ ] Alternativer Einstieg: GPT-4o + strukturierter Prompt für Raumextraktion testen
+- [ ] Three.js vs. Rhino.compute für Geometrie-Output abwägen
+- [ ] Waitlist Cartesian beitreten → Zugang für technische Tiefenanalyse: lnkd.in/g7Mw-ekM
