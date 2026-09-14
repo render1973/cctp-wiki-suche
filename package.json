@@ -8,7 +8,7 @@
   "scripts": {
     "start": "tsx server/index.ts",
     "start:http": "tsx server/http.ts",
-    "test": "tsx --test server/search.test.ts server/vault-search.test.ts server/git.test.ts",
+    "test": "tsx --test server/search.test.ts server/vault-search.test.ts server/git.test.ts server/vault-git.test.ts",
     "check": "tsc --noEmit"
   },
   "dependencies": {

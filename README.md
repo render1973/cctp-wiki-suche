@@ -80,7 +80,14 @@ export CCTP_VAULT_PATH=/pfad/zu/cctp-knowledge-lab
 
 Ist der Vault-Ordner nicht auffindbar, liefert `such_cctp_vault` eine klare Fehlermeldung mit dem geprüften Pfad statt eines Absturzes.
 
-**Nur lokal (stdio):** Für den gehosteten HTTP-Server (Railway) ist die Vault-Anbindung aktuell **nicht** vorgesehen — der Container müsste dafür zwei Git-Repos gleichzeitig bereithalten, was neue Komplexität gegenüber dem heutigen Single-Repo-Bootstrap bedeutet. Bewusst nicht Teil dieses Schritts.
+**Im gehosteten HTTP-Server (Railway):** Der Container hält zusätzlich zum eigenen `.git` einen zweiten, rein lesenden Checkout für den Vault (`server/vault-git.ts`, analog zum Bootstrap in `server/git.ts`, aber unabhängig davon — zwei getrennte Git-Historien, kein Submodule-Trick). Beim ersten `such_cctp_vault`-Aufruf wird per `git clone --depth 1` geklont, falls unter `CCTP_VAULT_PATH` noch kein Checkout liegt; danach hält ein Hintergrund-Pull alle fünf Minuten den Stand aktuell — nie ein Push, dieser zweite Checkout ist rein lesend.
+
+| Variable | Pflicht | Zweck |
+| --- | --- | --- |
+| `CCTP_VAULT_GIT_URL` | nein | Git-URL des Vault-Repos (Default: `https://github.com/render1973/cctp-knowledge-lab-vault.git`) |
+| `CCTP_VAULT_PATH` | im Container ja | Zielordner für den Vault-Checkout, z. B. `/app/vault-checkout` — ohne diese Variable würde der Default (Geschwisterordner `cctp-knowledge-lab`) im Container ins Leere zeigen |
+
+Schlägt der Klon oder ein Hintergrund-Pull fehl (z. B. Netzwerkproblem), bleiben die übrigen drei Wiki-Tools unbeeinträchtigt — nur `such_cctp_vault` meldet den Fehler, der Server stürzt nicht ab.
 
 ## In Claude Desktop einbinden
 
