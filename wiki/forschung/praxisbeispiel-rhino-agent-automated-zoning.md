@@ -4,7 +4,7 @@
 - Autor: Thomas Heim
 - Typ: praxisbeispiel
 - Themencluster: KI-Agenten, Computational Design, Städtebau, Parametrik
-- Quelle: LinkedIn-Post Abhinav Bhardwaj, 2026-09-13
+- Quelle: https://www.linkedin.com/in/abhinavbhardwaj/ (LinkedIn-Post Abhinav Bhardwaj, 2026-09-13, Video-Demo 32 Sek.)
 - Erfasst: 2026-09-14
 - Tags: rhino, ki-agent, python, automatisierung, zonierung, masterplan
 
