@@ -192,6 +192,81 @@ test("commitAndPushWikiChange: funktioniert trotz abweichendem Dateibesitzer am 
   }
 });
 
+test("commitAndPushWikiChange: überschreibt eine bestehende Seite trotz divergiertem origin (dirty tracked file blockiert Pull nicht)", async () => {
+  // Reproduziert den vom Nutzer gemeldeten Fall: schreibe_wiki_seite schreibt
+  // die überschriebene Seite VOR dem Commit/Push auf die Platte - das ist zum
+  // Zeitpunkt von commitAndPushWikiChange bereits eine dirty getrackte Datei.
+  // Hat origin zwischenzeitlich einen anderen Commit bekommen, verweigert
+  // `git pull --rebase` sich dann grundsätzlich mit dirtiger Arbeitskopie.
+  const { base, origin, cloneRepo } = initTestRepo();
+  try {
+    const cloneA = cloneRepo("cloneA");
+    const relPath = "wiki/foerdergeber/bestehende-seite.md";
+    mkdirSync(path.dirname(path.join(cloneA, relPath)), { recursive: true });
+    writeFileSync(path.join(cloneA, relPath), "# Bestehende Seite\n\n- Status: entwurf\n- Autor: Person A\n");
+    sh(cloneA, ["add", "."]);
+    sh(cloneA, ["commit", "-m", "Erste Fassung"]);
+    sh(cloneA, ["push", origin, "HEAD:main"]);
+
+    // Andere Person pusht währenddessen eine unabhängige Änderung auf origin.
+    const cloneOther = cloneRepo("cloneOther");
+    writeFileSync(path.join(cloneOther, "wiki", "foerdergeber", "von-anderer-person.md"), "# Von anderer Person\n\n- Status: entwurf\n");
+    sh(cloneOther, ["add", "."]);
+    sh(cloneOther, ["commit", "-m", "Von anderer Person"]);
+    sh(cloneOther, ["push", origin, "HEAD:main"]);
+
+    // schreibe_wiki_seite überschreibt die bestehende, getrackte Datei lokal -
+    // cloneA hat den fremden Commit oben noch nicht gesehen.
+    writeFileSync(path.join(cloneA, relPath), "# Bestehende Seite\n\n- Status: entwurf\n- Autor: Person A\n\nÜberarbeitet.\n");
+
+    const result = await commitAndPushWikiChange({
+      relPath,
+      author: { name: "Person A", email: "a@example.invalid" },
+      message: `Wiki: ${relPath} (Person A)`,
+      cwd: cloneA,
+    });
+
+    assert.equal(result.pushed, true);
+    const log = sh(origin, ["log", "--oneline", "main"]);
+    assert.match(log, /Von anderer Person/);
+    assert.match(log, new RegExp(relPath.split("/").pop()!.replace(".md", "")));
+    const content = sh(origin, ["show", `main:${relPath}`]);
+    assert.match(content, /Überarbeitet\./);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("commitAndPushWikiChange: bricht ab statt zu stashen, wenn fremde uncommittete Änderungen in der Arbeitskopie liegen", async () => {
+  const { base, cloneRepo } = initTestRepo();
+  try {
+    const cloneA = cloneRepo("cloneA");
+    const relPath = "wiki/foerdergeber/test-happy-path.md";
+    mkdirSync(path.dirname(path.join(cloneA, relPath)), { recursive: true });
+    writeFileSync(path.join(cloneA, relPath), "# Test\n\n- Status: entwurf\n");
+
+    // Fremde, unerwartete uncommittete Datei - z. B. Rest eines vorherigen
+    // abgebrochenen Laufs. Darf nicht stillschweigend mitgestasht werden.
+    writeFileSync(path.join(cloneA, "wiki", "foerdergeber", "fremder-rest.md"), "# Fremder Rest\n");
+
+    await assert.rejects(
+      () =>
+        commitAndPushWikiChange({
+          relPath,
+          author: { name: "Person A", email: "a@example.invalid" },
+          message: "Wiki: test",
+          cwd: cloneA,
+        }),
+      GitWriteError,
+    );
+
+    const status = sh(cloneA, ["status", "--porcelain"]);
+    assert.match(status, /fremder-rest\.md/, "fremde Änderung darf nicht verschwunden (gestasht) sein");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 test("commitAndPushWikiChange: zwei gleichzeitige Schreibvorgänge im selben Prozess werden serialisiert", async () => {
   const { base, origin, cloneRepo } = initTestRepo();
   try {
