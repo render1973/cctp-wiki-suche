@@ -6,6 +6,7 @@ export type VaultSearchHit = {
   bereich: string;
   status: string;
   rohquellePfad: string;
+  quelle?: string;
   textauszug: string;
 };
 
@@ -22,6 +23,7 @@ export function searchVault(query: string, bereich?: string, limit = 3): VaultSe
       bereich: page.bereich,
       status: page.status,
       rohquellePfad: page.path,
+      quelle: page.quelle,
       textauszug: passages.join(" […] "),
     });
     if (hits.length >= limit) break;

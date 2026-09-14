@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { parseTitle, parseStatus } from "./markdown.js";
+import { parseTitle, parseStatus, parseQuelle } from "./markdown.js";
 
 // Sieben Bereiche der CCTP-Wiki-Taxonomie. `schreibe_wiki_seite` validiert
 // gegen genau diese Liste; neue Bereiche gehören hier ergänzt und im README
@@ -25,6 +25,7 @@ export type WikiPage = {
   status: string;
   path: string;
   body: string;
+  quelle?: string;
 };
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
@@ -53,6 +54,7 @@ function loadPagesFromDisk(): WikiPage[] {
         status: parseStatus(body),
         path: path.relative(path.resolve(serverDir, ".."), filePath).split(path.sep).join("/"),
         body,
+        quelle: parseQuelle(body),
       });
     }
   }

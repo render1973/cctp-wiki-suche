@@ -14,3 +14,16 @@ export function parseStatus(body: string): string {
   const listStatus = body.match(/^-\s*Status:\s*(.+)$/im);
   return listStatus ? listStatus[1].trim() : "unbekannt";
 }
+
+// Original-Quell-URL einer Seite (Frontmatter/Metadaten-Feld "quelle"/"link").
+// Jeder Suchtreffer MUSS diesen Link sichtbar mitliefern, siehe README/Briefing
+// "Ergänzung: Quellenlinks bei Suchergebnissen".
+export function parseQuelle(body: string): string | undefined {
+  const frontmatter = body.match(/^---\n([\s\S]*?)\n---/);
+  if (frontmatter) {
+    const yamlQuelle = frontmatter[1].match(/^(?:quelle|link):\s*(.+)$/im);
+    if (yamlQuelle) return yamlQuelle[1].trim();
+  }
+  const listQuelle = body.match(/^-\s*(?:Quelle|Link):\s*(.+)$/im);
+  return listQuelle ? listQuelle[1].trim() : undefined;
+}

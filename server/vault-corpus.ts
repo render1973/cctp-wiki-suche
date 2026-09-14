@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { parseTitle, parseStatus } from "./markdown.js";
+import { parseTitle, parseStatus, parseQuelle } from "./markdown.js";
 
 // Bewusste Entscheidung (siehe Briefing "MCP-Vault-Lesezugriff"): dieser
 // Server LIEST den Obsidian-Vault nur, aus dessen eigenem Checkout. Keine
@@ -27,6 +27,7 @@ export type VaultPage = {
   status: string;
   path: string;
   body: string;
+  quelle?: string;
 };
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
@@ -89,6 +90,7 @@ export function getVaultPages(): VaultPage[] {
         status: parseStatus(body),
         path: "10-wiki/" + path.relative(wikiRoot, filePath).split(path.sep).join("/"),
         body,
+        quelle: parseQuelle(body),
       });
     }
   }

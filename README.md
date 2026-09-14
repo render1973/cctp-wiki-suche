@@ -5,7 +5,7 @@ MCP-Server ([`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotoco
 - **stdio, lokal** — läuft als Subprozess auf einem Rechner, nur für die Person, die ihn startet. Ursprüngliche Betriebsart, unverändert.
 - **HTTP, gehostet (Railway)** — läuft dauerhaft als Container, erreichbar für bis zu ~10 Kolleg:innen ohne lokale Installation, mit Pro-Person-Token. Für HSLU-Arbeitsrechner ohne Admin-Rechte gedacht.
 
-Der Server liest die Markdown-Seiten unter `wiki/` von der Platte, durchsucht sie und liefert nur Rohtreffer — Seitentitel, Bereich, Status, Rohquelle-Pfad und Textausschnitt. Das Formulieren der Antwort übernimmt der MCP-Client (z. B. Claude Desktop oder Claude Code), nicht dieses Repo.
+Der Server liest die Markdown-Seiten unter `wiki/` von der Platte, durchsucht sie und liefert nur Rohtreffer — Seitentitel, Bereich, Status, Rohquelle-Pfad, Quell-URL (falls im Frontmatter vorhanden) und Textausschnitt. Das Formulieren der Antwort übernimmt der MCP-Client (z. B. Claude Desktop oder Claude Code), nicht dieses Repo — dieser MUSS die Quell-URL bei jedem Treffer sichtbar mitliefern, nicht nur auf Nachfrage.
 
 CDE und DMS bleiben für verbindliche Projekt-, Rechts- und Normunterlagen führend.
 
@@ -48,7 +48,7 @@ Status der bestehenden Seiten: `freigegeben`.
 
 ## Tools
 
-- `such_cctp_wiki(query: string)` — durchsucht alle sieben Bereiche und gibt pro Treffer Titel, Bereich, Status, Rohquelle-Pfad und den relevanten Textausschnitt zurück.
+- `such_cctp_wiki(query: string)` — durchsucht alle sieben Bereiche und gibt pro Treffer Titel, Bereich, Status, Rohquelle-Pfad, Quell-URL (Feld `quelle`, falls im Frontmatter/in den Metadaten vorhanden) und den relevanten Textausschnitt zurück. Der Client muss die Quell-URL bei jedem Treffer sichtbar anzeigen, nicht nur auf Nachfrage.
 - `such_cctp_vault(query: string, bereich?: string)` — durchsucht **lesend** den Obsidian-Vault `cctp-knowledge-lab` (`10-wiki/`, ~600 Dateien: 180 Forschungsprojekte, ~436 Personen-Seiten, Lehre, Methoden-Katalog). Gibt Treffer im selben Format wie `such_cctp_wiki` zurück, optional gefiltert auf einen der Vault-Bereiche (`forschung`, `lehre`, `personen`, `entscheidungen`, `buero`, `dienstleistungen`, `projekte`). Reiner Lesezugriff — siehe [Vault-Anbindung](#vault-anbindung-such_cctp_vault) unten.
 - `liste_cctp_wiki_seiten(bereich?: string)` — gibt die Tabelle aller Seiten mit Titel, Bereich, Datei und Status zurück, optional auf einen Bereich gefiltert.
 - `schreibe_wiki_seite(bereich, dateiname, inhalt, ueberschreiben?)` — schreibt eine neue Seite unter `wiki/<bereich>/<dateiname>.md`. `bereich` muss einer der sieben oben genannten sein; `inhalt` ist der vollständige Markdown-Text inkl. `# Titel` und Metadaten-Liste. Status `geprueft`/`freigegeben` wird abgelehnt. Bestehende Dateien werden nur mit `ueberschreiben: true` überschrieben.

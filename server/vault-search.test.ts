@@ -33,7 +33,7 @@ test.before(() => {
   );
   writeFixturePage(
     "personen/beispiel-person.md",
-    "---\nstatus: entwurf\n---\n\n# Beispiel, Person\n\n" +
+    "---\nstatus: entwurf\nquelle: https://example.invalid/beispiel-person\n---\n\n# Beispiel, Person\n\n" +
       "Arbeitet seit mehreren Jahren zu Reallaboren und Mobilität in ländlichen Regionen der Schweiz.\n",
   );
 });
@@ -48,6 +48,13 @@ test("such_cctp_vault: findet Treffer über verschachtelte Unterordner hinweg (n
   const hits = searchVault("Reallabor Mobilität");
   assert.ok(hits.length >= 2, "erwartet Treffer aus forschung/ und personen/");
   assert.ok(hits.every((hit) => hit.rohquellePfad.startsWith("10-wiki/")));
+});
+
+test("such_cctp_vault: Treffer mit `quelle:`-Frontmatter liefert die Quell-URL im eigenen Feld", async () => {
+  const { searchVault } = await import("./vault-search.js");
+  const hits = searchVault("Reallabor Mobilität", "personen");
+  assert.ok(hits.length > 0);
+  assert.equal(hits[0].quelle, "https://example.invalid/beispiel-person");
 });
 
 test("such_cctp_vault: Bereich-Filter schränkt auf einen Vault-Ordner ein", async () => {

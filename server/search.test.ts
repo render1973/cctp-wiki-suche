@@ -18,6 +18,14 @@ test("such_cctp_wiki: Treffer liefert Titel, Bereich, Status, Pfad und Textaussc
   assert.ok(hit.textauszug.length > 0);
 });
 
+test("such_cctp_wiki: Treffer mit `- Quelle:`-Zeile liefert die Quell-URL im eigenen Feld", () => {
+  const hits = searchWiki("Bilhöfer Wissensmanagement KI Planungsbüro");
+  assert.ok(hits.length > 0, "erwartet mindestens einen Treffer");
+  const hit = hits.find((h) => h.rohquellePfad.includes("forschungsstand-bilhoefer"));
+  assert.ok(hit, "erwartet den Bilhöfer-Treffer");
+  assert.equal(hit?.quelle, "https://timo.bilhoefer.de (Abschnitt „Aktuelles\", abgerufen am 07.08.2026)");
+});
+
 test("such_cctp_wiki: kein Treffer bei bestandsfremdem Begriff", () => {
   const hits = searchWiki("xyzzyzzyzzy-quantumfrobnicator-nichtimbestand");
   assert.equal(hits.length, 0);
