@@ -9,6 +9,8 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { createWikiMcpServer } from "./mcp-server.js";
 import { resolveToken, assertTokenConfigPresent } from "./auth.js";
 import { commitAndPushWikiChange, pullLatest } from "./git.js";
+import { pullVaultLatest } from "./vault-git.js";
+import { resolveVaultRoot } from "./vault-corpus.js";
 
 const PORT = Number(process.env.PORT ?? 8080);
 const HINTERGRUND_PULL_INTERVALL_MS = 5 * 60 * 1000;
@@ -89,4 +91,12 @@ httpServer.listen(PORT, () => {
 
 setInterval(() => {
   pullLatest().catch((error) => console.error("Hintergrund-Pull fehlgeschlagen:", error));
+}, HINTERGRUND_PULL_INTERVALL_MS);
+
+// Rein lesend, unabhängig vom Wiki-Repo-Pull oben: läuft ins Leere, bis der
+// erste such_cctp_vault-Aufruf den Vault-Checkout angelegt hat.
+setInterval(() => {
+  pullVaultLatest(resolveVaultRoot()).catch((error) =>
+    console.error("Vault-Hintergrund-Pull fehlgeschlagen:", error),
+  );
 }, HINTERGRUND_PULL_INTERVALL_MS);

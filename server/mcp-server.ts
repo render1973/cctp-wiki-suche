@@ -2,7 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { searchWiki, listWikiPages } from "./search.js";
 import { searchVault } from "./vault-search.js";
-import { isVaultAvailable, vaultWikiRoot, VAULT_BEREICHE } from "./vault-corpus.js";
+import { isVaultAvailable, resolveVaultRoot, vaultWikiRoot, VAULT_BEREICHE } from "./vault-corpus.js";
+import { ensureVaultCloned } from "./vault-git.js";
 import { schreibeWikiSeite, type SchreibeWikiSeiteResult } from "./write.js";
 import { BEREICHE } from "./corpus.js";
 
@@ -59,6 +60,19 @@ export function createWikiMcpServer(context: WikiServerContext = {}): McpServer 
         .describe("Auf einen Vault-Bereich einschränken: " + VAULT_BEREICHE.join(", ")),
     },
     async ({ query, bereich }) => {
+      try {
+        await ensureVaultCloned(resolveVaultRoot());
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Vault-Checkout konnte nicht angelegt werden: ${(error as Error).message}`,
+            },
+          ],
+          isError: true,
+        };
+      }
       if (!isVaultAvailable()) {
         return {
           content: [
