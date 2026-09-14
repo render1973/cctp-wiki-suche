@@ -1,6 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { searchWiki, listWikiPages } from "./search.js";
+import { searchVault } from "./vault-search.js";
+import { isVaultAvailable, vaultWikiRoot, VAULT_BEREICHE } from "./vault-corpus.js";
 import { schreibeWikiSeite, type SchreibeWikiSeiteResult } from "./write.js";
 import { BEREICHE } from "./corpus.js";
 
@@ -34,6 +36,45 @@ export function createWikiMcpServer(context: WikiServerContext = {}): McpServer 
       const hits = searchWiki(query);
       if (hits.length === 0) {
         return { content: [{ type: "text", text: "Keine Treffer im CCTP-Wiki." }] };
+      }
+      return { content: [{ type: "text", text: JSON.stringify(hits, null, 2) }] };
+    },
+  );
+
+  const vaultBereichEnum = z.enum(VAULT_BEREICHE);
+
+  server.tool(
+    "such_cctp_vault",
+    "Durchsucht LESEND den Obsidian-Vault cctp-knowledge-lab (10-wiki/, Bereiche " +
+      VAULT_BEREICHE.join(", ") +
+      ") und gibt pro Treffer Seitentitel, Bereich, Status, Rohquelle-Pfad und den relevanten " +
+      "Textausschnitt zurück. Enthält das eigentliche CCTP-Wissen (Forschungsprojekte, Personen, " +
+      "Lehre, Methoden-Katalog) — viel umfangreicher als such_cctp_wiki. Nur Lesezugriff: dieses " +
+      "Werkzeug schreibt nie in den Vault, dafür bleibt schreibe_wiki_seite exklusiv für das " +
+      "eigene wiki/.",
+    {
+      query: z.string().trim().min(2).describe("Suchbegriff oder Frage an den Vault"),
+      bereich: vaultBereichEnum
+        .optional()
+        .describe("Auf einen Vault-Bereich einschränken: " + VAULT_BEREICHE.join(", ")),
+    },
+    async ({ query, bereich }) => {
+      if (!isVaultAvailable()) {
+        return {
+          content: [
+            {
+              type: "text",
+              text:
+                `Vault nicht gefunden unter ${vaultWikiRoot()}. Lokalen Checkout von ` +
+                "cctp-knowledge-lab prüfen oder Pfad über die Umgebungsvariable CCTP_VAULT_PATH setzen.",
+            },
+          ],
+          isError: true,
+        };
+      }
+      const hits = searchVault(query, bereich);
+      if (hits.length === 0) {
+        return { content: [{ type: "text", text: "Keine Treffer im Vault." }] };
       }
       return { content: [{ type: "text", text: JSON.stringify(hits, null, 2) }] };
     },
