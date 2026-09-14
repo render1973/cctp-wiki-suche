@@ -22,6 +22,43 @@ function resolveVaultGitUrl(): string {
   return process.env.CCTP_VAULT_GIT_URL?.trim() || DEFAULT_VAULT_GIT_URL;
 }
 
+function parseGithubOwnerRepo(url: string): { owner: string; repo: string } | null {
+  const withoutCreds = url.replace(/^https:\/\/[^@]*@/, "https://");
+  const match = withoutCreds.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+?)(\.git)?\/?$/);
+  return match ? { owner: match[1], repo: match[2] } : null;
+}
+
+/**
+ * URL für `git clone`/den `origin`-Remote. Das Vault-Repo ist privat - ohne
+ * Token schlägt der Klon in einem frischen Container (leeres Dateisystem,
+ * kein bereits vorhandener Checkout) mit einem Authentifizierungsfehler fehl,
+ * auch wenn ein älterer Container-Prozess mit bereits vorhandenem Checkout
+ * weiterhin klaglos liest. Mit CCTP_VAULT_GIT_TOKEN gesetzt: analog zu
+ * resolvePushTarget in git.ts wird das Token in die HTTPS-URL eingesetzt
+ * (nicht auf Platte persistiert über einen credential.helper - landet aber,
+ * anders als beim Push dort, als Teil der `origin`-Remote-URL in der
+ * .git/config dieses Checkouts, weil `git clone` die übergebene URL als
+ * Remote speichert; das bleibt aber lokal im - ohnehin flüchtigen -
+ * Container, es wird nie gepusht oder sonst wie weitergereicht). Ohne Token:
+ * unverändert die Basis-URL, nutzt was am Rechner/Container bereits an
+ * Git-Credentials konfiguriert ist (praktisch fürs lokale Testen) oder
+ * funktioniert, falls das Repo doch öffentlich ist/wird.
+ */
+export function resolveVaultCloneUrl(): string {
+  const baseUrl = resolveVaultGitUrl();
+  const token = process.env.CCTP_VAULT_GIT_TOKEN?.trim();
+  if (!token) return baseUrl;
+  const parsed = parseGithubOwnerRepo(baseUrl);
+  if (!parsed) return baseUrl; // z. B. lokaler Pfad in Tests - kein GitHub-HTTPS-Ziel, Token passt nicht
+  return `https://x-access-token:${token}@github.com/${parsed.owner}/${parsed.repo}.git`;
+}
+
+/** Ersetzt ein eingesetztes CCTP_VAULT_GIT_TOKEN in Fehlermeldungen durch "***", damit es nie in einer Tool-Antwort landet. */
+function maskToken(message: string): string {
+  const token = process.env.CCTP_VAULT_GIT_TOKEN?.trim();
+  return token ? message.split(token).join("***") : message;
+}
+
 // Gleicher "dubious ownership"-Fallstrick wie beim Wiki-Repo (siehe
 // ausführlicher Kommentar in git.ts) kann grundsätzlich auch hier auftreten,
 // falls der Vault-Checkout-Pfad je auf einen Bind-Mount zeigt - deshalb
@@ -52,7 +89,7 @@ async function git(args: string[], cwd: string): Promise<string> {
   } catch (error) {
     const stderr = (error as { stderr?: string }).stderr ?? "";
     const message = stderr.trim() || (error as Error).message;
-    throw new VaultGitError(`git ${args.join(" ")} fehlgeschlagen: ${message}`);
+    throw new VaultGitError(maskToken(`git ${args.join(" ")} fehlgeschlagen: ${message}`));
   } finally {
     rmSync(configDir, { recursive: true, force: true });
   }
@@ -85,7 +122,7 @@ export function ensureVaultCloned(vaultRoot: string): Promise<void> {
 async function cloneVault(vaultRoot: string): Promise<void> {
   const parent = path.dirname(vaultRoot);
   mkdirSync(parent, { recursive: true });
-  await git(["clone", "--depth", "1", resolveVaultGitUrl(), vaultRoot], parent);
+  await git(["clone", "--depth", "1", resolveVaultCloneUrl(), vaultRoot], parent);
 }
 
 let pullQueue: Promise<unknown> = Promise.resolve();

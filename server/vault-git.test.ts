@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { ensureVaultCloned, pullVaultLatest, VaultGitError } from "./vault-git.js";
+import { ensureVaultCloned, pullVaultLatest, resolveVaultCloneUrl, VaultGitError } from "./vault-git.js";
 
 // Läuft ausschliesslich gegen ein lokales temporäres bare Repo - kein
 // Netzwerk, kein echtes GitHub. Prüft genau die Mechanik aus dem Briefing:
@@ -105,6 +105,55 @@ test("pullVaultLatest: no-op, solange noch kein Checkout existiert", async () =>
     await assert.doesNotReject(() => pullVaultLatest(vaultRoot));
   } finally {
     rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("resolveVaultCloneUrl: setzt CCTP_VAULT_GIT_TOKEN in eine github.com-HTTPS-URL ein", () => {
+  const previousUrl = process.env.CCTP_VAULT_GIT_URL;
+  const previousToken = process.env.CCTP_VAULT_GIT_TOKEN;
+  process.env.CCTP_VAULT_GIT_URL = "https://github.com/render1973/cctp-knowledge-lab-vault.git";
+  process.env.CCTP_VAULT_GIT_TOKEN = "geheimes-test-token";
+  try {
+    assert.equal(
+      resolveVaultCloneUrl(),
+      "https://x-access-token:geheimes-test-token@github.com/render1973/cctp-knowledge-lab-vault.git",
+    );
+  } finally {
+    if (previousUrl === undefined) delete process.env.CCTP_VAULT_GIT_URL;
+    else process.env.CCTP_VAULT_GIT_URL = previousUrl;
+    if (previousToken === undefined) delete process.env.CCTP_VAULT_GIT_TOKEN;
+    else process.env.CCTP_VAULT_GIT_TOKEN = previousToken;
+  }
+});
+
+test("resolveVaultCloneUrl: lässt lokale Pfade (z. B. in Tests) unverändert, selbst mit gesetztem Token", () => {
+  const previousUrl = process.env.CCTP_VAULT_GIT_URL;
+  const previousToken = process.env.CCTP_VAULT_GIT_TOKEN;
+  const localPath = path.join(tmpdir(), "irgendein-lokales-bare-repo.git");
+  process.env.CCTP_VAULT_GIT_URL = localPath;
+  process.env.CCTP_VAULT_GIT_TOKEN = "geheimes-test-token";
+  try {
+    assert.equal(resolveVaultCloneUrl(), localPath);
+  } finally {
+    if (previousUrl === undefined) delete process.env.CCTP_VAULT_GIT_URL;
+    else process.env.CCTP_VAULT_GIT_URL = previousUrl;
+    if (previousToken === undefined) delete process.env.CCTP_VAULT_GIT_TOKEN;
+    else process.env.CCTP_VAULT_GIT_TOKEN = previousToken;
+  }
+});
+
+test("resolveVaultCloneUrl: ohne Token bleibt die Basis-URL unverändert", () => {
+  const previousUrl = process.env.CCTP_VAULT_GIT_URL;
+  const previousToken = process.env.CCTP_VAULT_GIT_TOKEN;
+  process.env.CCTP_VAULT_GIT_URL = "https://github.com/render1973/cctp-knowledge-lab-vault.git";
+  delete process.env.CCTP_VAULT_GIT_TOKEN;
+  try {
+    assert.equal(resolveVaultCloneUrl(), "https://github.com/render1973/cctp-knowledge-lab-vault.git");
+  } finally {
+    if (previousUrl === undefined) delete process.env.CCTP_VAULT_GIT_URL;
+    else process.env.CCTP_VAULT_GIT_URL = previousUrl;
+    if (previousToken === undefined) delete process.env.CCTP_VAULT_GIT_TOKEN;
+    else process.env.CCTP_VAULT_GIT_TOKEN = previousToken;
   }
 });
 
