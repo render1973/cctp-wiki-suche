@@ -242,6 +242,26 @@ export type GitAuthor = { name: string; email: string };
 export type CommitAndPushResult = { pushed: boolean; branch: string };
 
 /**
+ * Legt relPath beiseite, falls es bereits dirty in der Arbeitskopie liegt.
+ * `schreibeWikiSeite` schreibt die neue/überschriebene Seite VOR dem
+ * Commit/Push auf die Platte - trifft das eine bereits getrackte Datei
+ * (Überschreiben einer bestehenden Seite), ist sie zum Zeitpunkt von
+ * `pullOrigin` bereits als Änderung sichtbar. `git pull --rebase` verweigert
+ * sich dann grundsätzlich mit "cannot pull with rebase: You have unstaged
+ * changes" - unabhängig davon, ob der eingehende Rebase dieselbe Datei
+ * überhaupt anfasst. Nur relPath stashen (nicht die ganze Arbeitskopie) hält
+ * das auf den tatsächlichen Auslöser begrenzt.
+ */
+async function stashRelPathIfDirty(cwd: string, relPath: string): Promise<boolean> {
+  const status = await git(["status", "--porcelain", "--", relPath], { cwd });
+  if (status.trim().length === 0) return false;
+  await git(["stash", "push", "--include-untracked", "--message", "cctp-wiki-pending-write", "--", relPath], {
+    cwd,
+  });
+  return true;
+}
+
+/**
  * Fügt relPath zum Index hinzu, committet mit dem aufgelösten Klarnamen als
  * Autor (Committer bleibt der Bot) und pusht. Bei Push-Konflikt (jemand
  * anderes hat zwischenzeitlich gepusht): rebase auf den neuen Stand, erneut
@@ -256,7 +276,29 @@ export function commitAndPushWikiChange(params: {
   const cwd = params.cwd ?? repoRoot;
   return serialize(async () => {
     const branch = await getCurrentBranch(cwd);
-    await pullOrigin(cwd, branch);
+
+    // Vor dem Stash prüfen, ob ausser relPath noch etwas anderes uncommittet
+    // in der Arbeitskopie liegt - das wäre kein normaler Schreibvorgang
+    // (z. B. Rest eines vorherigen abgebrochenen Laufs) und wird nicht
+    // stillschweigend mitgestasht/verworfen, sondern meldet sich als Fehler.
+    const fullStatus = await git(["status", "--porcelain"], { cwd });
+    const unerwartet = fullStatus
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && !line.endsWith(params.relPath));
+    if (unerwartet.length > 0) {
+      throw new GitWriteError(
+        "Arbeitskopie enthält uncommittete Änderungen ausserhalb der aktuellen Schreiboperation " +
+          `(${params.relPath}), Abbruch statt automatischem Stash: ${unerwartet.join(" | ")}`,
+      );
+    }
+
+    const gestasht = await stashRelPathIfDirty(cwd, params.relPath);
+    try {
+      await pullOrigin(cwd, branch);
+    } finally {
+      if (gestasht) await git(["stash", "pop"], { cwd });
+    }
 
     const status = await git(["status", "--porcelain", "--", params.relPath], { cwd });
     if (status.trim().length === 0) {
