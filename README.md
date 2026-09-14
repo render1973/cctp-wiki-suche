@@ -86,8 +86,9 @@ Ist der Vault-Ordner nicht auffindbar, liefert `such_cctp_vault` eine klare Fehl
 | --- | --- | --- |
 | `CCTP_VAULT_GIT_URL` | nein | Git-URL des Vault-Repos (Default: `https://github.com/render1973/cctp-knowledge-lab-vault.git`) |
 | `CCTP_VAULT_PATH` | im Container ja | Zielordner für den Vault-Checkout, z. B. `/app/vault-checkout` — ohne diese Variable würde der Default (Geschwisterordner `cctp-knowledge-lab`) im Container ins Leere zeigen |
+| `CCTP_VAULT_GIT_TOKEN` | im Container ja, sofern das Vault-Repo privat ist | GitHub-PAT mit Leserecht auf `render1973/cctp-knowledge-lab-vault`, für den Klon im Container. Analog zu `WIKI_GIT_TOKEN` in `server/git.ts`: wird nur pro Klon-URL eingesetzt, nicht dauerhaft irgendwo im Klartext geloggt. **Ohne diese Variable schlägt der Erst-Klon in jedem frisch gestarteten Container fehl**, solange das Vault-Repo privat ist — Railway-Container-Dateisysteme sind flüchtig, ein Redeploy/Neustart wirft den bisherigen Checkout weg |
 
-Schlägt der Klon oder ein Hintergrund-Pull fehl (z. B. Netzwerkproblem), bleiben die übrigen drei Wiki-Tools unbeeinträchtigt — nur `such_cctp_vault` meldet den Fehler, der Server stürzt nicht ab.
+Schlägt der Klon oder ein Hintergrund-Pull fehl (z. B. Netzwerkproblem oder fehlendes `CCTP_VAULT_GIT_TOKEN` bei einem privaten Repo), bleiben die übrigen drei Wiki-Tools unbeeinträchtigt — nur `such_cctp_vault` meldet den Fehler, der Server stürzt nicht ab.
 
 ## In Claude Desktop einbinden
 
@@ -171,6 +172,7 @@ Token ergänzen/entziehen: `WIKI_TOKENS` in Railway unter **Variables** bearbeit
    | --- | --- | --- |
    | `WIKI_TOKENS` | ja | Token → Klarname/E-Mail-Mapping (siehe oben) |
    | `WIKI_GIT_TOKEN` | empfohlen | GitHub-PAT mit Schreibrecht auf dieses Repo, für den Push. Ohne diese Variable versucht der Server `git push origin`, was im Container ohne hinterlegte Credentials fehlschlägt |
+   | `CCTP_VAULT_GIT_TOKEN` | ja, sofern das Vault-Repo privat ist | GitHub-PAT mit Leserecht auf `render1973/cctp-knowledge-lab-vault`, für den Klon von `such_cctp_vault` — siehe [Vault-Anbindung](#vault-anbindung-such_cctp_vault) |
    | `WIKI_GIT_BRANCH` | nur falls nötig | Fallback-Branch, falls der Checkout im Container jemals mit detached HEAD startet (bekannter Fallstrick — der Server ermittelt den Branch sonst immer explizit selbst) |
    | `WIKI_GIT_COMMITTER_NAME` / `WIKI_GIT_COMMITTER_EMAIL` | nein | Überschreibt die Bot-Committer-Identität (Default: "CCTP Wiki Bot"). Der inhaltliche Autor kommt immer aus `WIKI_TOKENS`, unabhängig davon |
    | `PORT` | nein | Setzt Railway automatisch |
