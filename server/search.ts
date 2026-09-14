@@ -6,6 +6,7 @@ export type WikiSearchHit = {
   bereich: string;
   status: string;
   rohquellePfad: string;
+  quelle?: string;
   textauszug: string;
 };
 
@@ -21,6 +22,7 @@ export function searchWiki(query: string, limit = 3): WikiSearchHit[] {
       bereich: page.bereich,
       status: page.status,
       rohquellePfad: page.path,
+      quelle: page.quelle,
       textauszug: passages.join(" […] "),
     });
     if (hits.length >= limit) break;

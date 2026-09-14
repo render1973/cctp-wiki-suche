@@ -31,7 +31,8 @@ export function createWikiMcpServer(context: WikiServerContext = {}): McpServer 
 
   server.tool(
     "such_cctp_wiki",
-    "Durchsucht das CCTP-Wiki (alle sieben Bereiche unter wiki/) und gibt pro Treffer Seitentitel, Bereich, Status, Rohquelle-Pfad und den relevanten Textausschnitt zurück.",
+    "Durchsucht das CCTP-Wiki (alle sieben Bereiche unter wiki/) und gibt pro Treffer Seitentitel, Bereich, Status, Rohquelle-Pfad, Quell-URL (Feld `quelle`) und den relevanten Textausschnitt zurück. " +
+      "Gib bei jedem Treffer die vollständige Quell-URL aus dem Feld `quelle` mit aus, sichtbar im Ergebnis — nicht nur den Titel und Textauszug. Zeig die Links immer direkt an, ohne dass danach gefragt werden muss.",
     { query: z.string().trim().min(2).describe("Suchbegriff oder Frage an das Wiki") },
     async ({ query }) => {
       const hits = searchWiki(query);
@@ -52,7 +53,10 @@ export function createWikiMcpServer(context: WikiServerContext = {}): McpServer 
       "Textausschnitt zurück. Enthält das eigentliche CCTP-Wissen (Forschungsprojekte, Personen, " +
       "Lehre, Methoden-Katalog) — viel umfangreicher als such_cctp_wiki. Nur Lesezugriff: dieses " +
       "Werkzeug schreibt nie in den Vault, dafür bleibt schreibe_wiki_seite exklusiv für das " +
-      "eigene wiki/.",
+      "eigene wiki/. " +
+      "Gib bei jedem Treffer die vollständige Quell-URL aus dem Feld `quelle` mit aus, sichtbar im " +
+      "Ergebnis — nicht nur den Titel und Textauszug. Zeig die Links immer direkt an, ohne dass " +
+      "danach gefragt werden muss.",
     {
       query: z.string().trim().min(2).describe("Suchbegriff oder Frage an den Vault"),
       bereich: vaultBereichEnum
