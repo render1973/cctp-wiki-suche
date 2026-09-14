@@ -122,7 +122,18 @@ export function ensureVaultCloned(vaultRoot: string): Promise<void> {
 async function cloneVault(vaultRoot: string): Promise<void> {
   const parent = path.dirname(vaultRoot);
   mkdirSync(parent, { recursive: true });
-  await git(["clone", "--depth", "1", resolveVaultCloneUrl(), vaultRoot], parent);
+  try {
+    await git(["clone", "--depth", "1", resolveVaultCloneUrl(), vaultRoot], parent);
+  } catch (error) {
+    // Ein abgebrochener/fehlgeschlagener Klon kann einen halb-fertigen
+    // `.git`-Ordner hinterlassen. ensureVaultCloned prüft nur "existiert
+    // .git" - ohne diesen Aufräumschritt würde jeder weitere Aufruf den
+    // kaputten Zustand für "schon geklont" halten und nie neu versuchen.
+    // Deshalb hier den Zielordner komplett entfernen, damit der nächste
+    // Aufruf garantiert wieder bei null anfängt.
+    rmSync(vaultRoot, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 let pullQueue: Promise<unknown> = Promise.resolve();

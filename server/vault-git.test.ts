@@ -108,6 +108,31 @@ test("pullVaultLatest: no-op, solange noch kein Checkout existiert", async () =>
   }
 });
 
+test("ensureVaultCloned: räumt einen kaputten Checkout-Ordner nach Fehlschlag auf, statt dauerhaft hängen zu bleiben", async () => {
+  const { base, origin } = initBareOrigin();
+  const previousUrl = process.env.CCTP_VAULT_GIT_URL;
+  process.env.CCTP_VAULT_GIT_URL = origin;
+  try {
+    const vaultRoot = path.join(base, "vault-checkout");
+    // Simuliert einen zuvor abgebrochenen Klon-Versuch: ein nicht-leerer
+    // Zielordner ohne vollständiges .git - `git clone` weigert sich, dort
+    // hineinzuklonen ("destination path already exists").
+    mkdirSync(vaultRoot, { recursive: true });
+    writeFileSync(path.join(vaultRoot, "halbfertig.txt"), "Rest eines abgebrochenen Klons\n");
+
+    await assert.rejects(() => ensureVaultCloned(vaultRoot), VaultGitError);
+    assert.equal(existsSync(vaultRoot), false, "kaputter Ordner sollte nach dem Fehlschlag entfernt sein");
+
+    // Nächster Versuch startet sauber neu, statt am kaputten Zustand hängen zu bleiben.
+    await ensureVaultCloned(vaultRoot);
+    assert.ok(existsSync(path.join(vaultRoot, ".git")));
+  } finally {
+    if (previousUrl === undefined) delete process.env.CCTP_VAULT_GIT_URL;
+    else process.env.CCTP_VAULT_GIT_URL = previousUrl;
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 test("resolveVaultCloneUrl: setzt CCTP_VAULT_GIT_TOKEN in eine github.com-HTTPS-URL ein", () => {
   const previousUrl = process.env.CCTP_VAULT_GIT_URL;
   const previousToken = process.env.CCTP_VAULT_GIT_TOKEN;
