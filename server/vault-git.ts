@@ -59,6 +59,26 @@ function maskToken(message: string): string {
   return token ? message.split(token).join("***") : message;
 }
 
+/**
+ * Einmal beim Serverstart ins Log schreiben, ob CCTP_VAULT_GIT_TOKEN in
+ * diesem laufenden Prozess überhaupt gesetzt ist - nie der Wert selbst, nur
+ * ja/nein plus Länge. Grund: der Fehler "could not read Username for
+ * 'https://github.com'" beim Klonen sieht nach einem Code-Bug aus, ist aber
+ * meist schlicht ein fehlendes Token in genau DIESER Umgebung (z. B. weil
+ * mehrere Railway-Services/-Deployments existieren und nicht überall
+ * dieselben Variablen gesetzt sind). Diese Zeile macht das ohne einen
+ * gezielten Testaufruf direkt im Railway-Log sichtbar.
+ */
+export function logVaultTokenStatus(): void {
+  const token = process.env.CCTP_VAULT_GIT_TOKEN?.trim();
+  const url = resolveVaultGitUrl();
+  if (token) {
+    console.log(`CCTP_VAULT_GIT_TOKEN gesetzt (${token.length} Zeichen), Vault-URL: ${url}`);
+  } else {
+    console.log(`CCTP_VAULT_GIT_TOKEN NICHT gesetzt, Vault-URL: ${url}`);
+  }
+}
+
 // Gleicher "dubious ownership"-Fallstrick wie beim Wiki-Repo (siehe
 // ausführlicher Kommentar in git.ts) kann grundsätzlich auch hier auftreten,
 // falls der Vault-Checkout-Pfad je auf einen Bind-Mount zeigt - deshalb

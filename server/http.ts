@@ -9,7 +9,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { createWikiMcpServer } from "./mcp-server.js";
 import { resolveToken, assertTokenConfigPresent } from "./auth.js";
 import { commitAndPushWikiChange, pullLatest } from "./git.js";
-import { pullVaultLatest } from "./vault-git.js";
+import { pullVaultLatest, logVaultTokenStatus } from "./vault-git.js";
 import { resolveVaultRoot } from "./vault-corpus.js";
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -19,6 +19,11 @@ const MCP_PFAD = "/mcp";
 // Beim Start hart scheitern, wenn WIKI_TOKENS fehlt/kaputt ist, statt erst bei
 // der ersten Anfrage - macht Fehlkonfiguration sofort im Railway-Log sichtbar.
 assertTokenConfigPresent();
+
+// Nur ein Log-Eintrag, kein harter Fail (der Vault-Klon ist optional/privat) -
+// macht sichtbar, ob CCTP_VAULT_GIT_TOKEN in genau diesem laufenden Prozess
+// gesetzt ist, ohne dafür such_cctp_vault aufrufen zu müssen.
+logVaultTokenStatus();
 
 function extractBearerToken(header: IncomingHttpHeaders["authorization"]): string | undefined {
   const value = Array.isArray(header) ? header[0] : header;
